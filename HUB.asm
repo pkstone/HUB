@@ -173,22 +173,22 @@ C908   20 02 CB             JSR UPDDSP
 
 C90B   4C AA C8   JUMP00    JMP MAINLP
 
-C90E   B1 C9      CMDTAB    .WORD SRC9B1
-C910   B9 C9                .WORD SRC9B9
-C912   C1 C9                .WORD SRC9C1
-C914   C9 C9                .WORD SRC9C9
-C916   D1 C9                .WORD SRC9D1
-C919   DC C9                .WORD SRC9DC
-C91A   F3 C9                .WORD SRC9F3
-C91C   03 CA                .WORD SRCA03
-C91E   07 CA                .WORD SRCA07
-C920   0F CA                .WORD SRCA0F
-C922   17 CA                .WORD SRCA17
-C924   1F CA                .WORD SRCA1F
-C926   2A CA                .WORD SRCA2A
-C928   3A CA                .WORD SRCA3A
-C92A   42 CA                .WORD SRCA42
-C92C   4A CA                .WORD SRCA4A
+C90E   B1 C9      CMDTAB    .WORD CMD_01
+C910   B9 C9                .WORD CMD_02
+C912   C1 C9                .WORD CMD_03
+C914   C9 C9                .WORD CMD_04
+C916   D1 C9                .WORD CMD_05
+C919   DC C9                .WORD CMD_06
+C91A   F3 C9                .WORD CMD_08
+C91C   03 CA                .WORD CMD_0A
+C91E   07 CA                .WORD CMD_0B
+C920   0F CA                .WORD CMD_0C
+C922   17 CA                .WORD CMD_0D
+C924   1F CA                .WORD CMD_0E
+C926   2A CA                .WORD CMD_0F
+C928   3A CA                .WORD CMD_10
+C92A   42 CA                .WORD CMD_11
+C92C   4A CA                .WORD CMD_12
 
 C92E   74        DSPDAT     .BYTE $74
 C92F   1C                   .BYTE $1C
@@ -274,82 +274,83 @@ C9AD   20 D5 CA             JSR WRACIA		;Write to ACIA pos 1
 C9B0   60                   RTS
 
                    ; Commands received from ACIAs
-C9B1   A0 00       SRC9B1   LDY #$00
+C9B1   A0 00       CMD_01   LDY #$00
 C9B3   20 34 C9             JSR SRC934
 C9B6   4C 0B C9             JMP JUMP00
 
-C9B9   A0 00       SRC9B9   LDY #$00
+C9B9   A0 00       CMD_02   LDY #$00
 C9BB   20 4E C9             JSR SRC94E
 C9BE   4C 0B C9             JMP JUMP00
 
-C9C1   A0 01       SRC9C1   LDY #$01
+C9C1   A0 01       CMD_03   LDY #$01
 C9C3   20 34 C9             JSR SRC934
 C9C6   4C 0B C9             JMP JUMP00
 
-C9C9   A0 04       SRC9C9   LDY #$04
+C9C9   A0 04       CMD_04   LDY #$04
 C9CB   20 34 C9             JSR SRC934
 C9CE   4C 0B C9             JMP JUMP00
 
-C9D1   A0 04       SRC9D1   LDY #$04
+C9D1   A0 04       CMD_05   LDY #$04
 C9D3   20 4E C9             JSR SRC94E
 C9D6   20 69 C9             JSR SRC969
 C9D9   4C 0B C9             JMP JUMP00
 
-C9DC   18          SRC9DC   CLC
+C9DC   18          CMD_06   CLC
 C9DD   A0 00                LDY #$00
 C9DF   B1 24                LDA ($24),Y
 C9E1   65 20                ADC $20
 C9E3   91 24                STA ($24),Y
-C9E5   90 09                BCC BRC9F0
+C9E5   90 09                BCC CMD_07
 C9E7   18                   CLC
 C9E8   A0 01                LDY #$01
 C9EA   B1 24                LDA ($24),Y
 C9EC   69 01                ADC #$01
 C9EE   91 24                STA ($24),Y
-C9F0   4C 0B C9    BRC9F0   JMP JUMP00
+C9F0   4C 0B C9    CMD_07   JMP JUMP00
 
-C9F3   A0 04       SRC9F3   LDY #$04
+C9F3   A0 04       CMD_08   LDY #$04
 C9F5   20 4E C9             JSR SRC94E
 C9F8   20 69 C9             JSR SRC969
 C9FB   A0 00                LDY #$00
 C9FD   20 77 C9             JSR SRC977
 CA00   4C 0B C9             JMP JUMP00
 
-CA03   EA          SRCA03   NOP
+CA03   EA          CMD_0A   NOP
 CA04   4C 0B C9             JMP JUMP00
 
-CA07   A0 02       SRCA07   LDY #$02
+CA07   A0 02       CMD_0B   LDY #$02
 CA09   20 34 C9             JSR SRC934
 CA0C   4C 0B C9             JMP JUMP00
 
-CA0F   A0 02       SRCA0F   LDY #$02
+CA0F   A0 02       CMD_0C   LDY #$02
 CA11   20 4E C9             JSR SRC94E
 CA14   4C 0B C9             JMP JUMP00
 
-CA17   A0 03       SRCA17   LDY #$03
+CA17   A0 03       CMD_0D   LDY #$03
 CA19   20 34 C9             JSR SRC934
 CA1C   4C 0B C9             JMP JUMP00
 
-CA1F   A0 02       SRCA1F   LDY #$02
+CA1F   A0 02       CMD_0E   LDY #$02
 CA21   20 5F C9             JSR SRC95F
 CA24   20 89 C9             JSR SRC989
 CA27   4C 0B C9             JMP JUMP00
 
-CA2A   A0 02       SRCA2A   LDY #$02
+CA2A   A0 02       CMD_0F   LDY #$02
 CA2C   20 5F C9             JSR SRC95F
 CA2F   20 89 C9             JSR SRC989
 CA32   A0 02                LDY #$02
 CA34   20 77 C9             JSR SRC977
 CA37   4C 0B C9             JMP JUMP00
 
-CA3A   A5 00       SRCA3A   LDA $00
+CA3A   A5 00       CMD_10   LDA $00
 CA3C   20 9E C9             JSR SRC99E
 CA3F   4C 0B C9             JMP JUMP00
-CA42   A5 01                LDA $01
+
+CA42   A5 01       CMD_11   LDA $01
 CA44   20 9E C9             JSR SRC99E
 CA47   4C 0B C9             JMP JUMP00
 
-CA4A   A5 20       SRCA4A   LDA $20
+CA4A   A5 20       CMD_12   LDA $20
 CA4C   C9 01                CMP #$01
 CA4E   D0 06                BNE BRCA56
 CA50   20 8F CA             JSR SRCA8F
@@ -409,7 +410,7 @@ CAB8   68                   PLA
 CAB9   AA                   TAX
 CABA   6C 2F 00             JMP ($002F)
 
-CABD   C5 CA     HBWADR     .WORD HUBR0
+CABD   C5 CA      HBWADR    .WORD HUBR0
 CABF   C9 CA                .WORD HUBR1
 CAC1   CD CA                .WORD HUBR2
 CAC3   D1 CA                .WORD HUBR3
@@ -521,7 +522,7 @@ CB7F   AA                   TAX
 CB80   68                   PLA
 CB81   40                   RTI
 
-CB82   91 39                STA ($39),Y
+CB82   91 39      STOREB    STA ($39),Y
 CB84   E6 39                INC $39
 CB86   8A                   TXA
 CB87   91 39                STA ($39),Y
@@ -536,7 +537,8 @@ CB96   8D 10 40             STA HUB_AS
 CB99   8D 20 40             STA HUB_BS
 CB9C   8D 40 40             STA HUB_CS
 CB9F   A9 02                LDA #$02
-CBA1   85 3D                JSR BEEP 
+CBA1   85 3D                STA $3D
+CBA3   20 72 89             JSR BEEP            ;SYM monitor call
 CBA6   60         BRCBA6    RTS
 
 CBA7   6C 2B 00   BRCBA7    JMP ($002B)
