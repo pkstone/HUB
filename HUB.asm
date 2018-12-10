@@ -10,26 +10,32 @@ HUB_C  = $4041			;HUB ACIA C - Data register
 HUB_DS = $4080			;HUB ACIA D - Control/Status register
 HUB_D  = $4081			;HUB ACIA D - Data register
 
+; SYM Monitor subroutines
+BEEP   = $8972
+
+; VIA (6522) #1
 V1T1CL = $A004           ;VIA 1 Timer 1 Write Latch / Read Counter Low byte
 V1T2CL = $A008           ;VIA 1 Timer 2 Write Latch / Read Counter Low byte
-VI1ACR = $A00B           ;VIA 1 Auxiliary Control Register
-VI1IFR = $A00D           ;VIA 1 Interrupt Flag Register
-VI1IER = $A00E           ;VIA 1 Interrupt Enable Register
+V1_ACR = $A00B           ;VIA 1 Auxiliary Control Register
+V1_IFR = $A00D           ;VIA 1 Interrupt Flag Register
+V1_IER = $A00E           ;VIA 1 Interrupt Enable Register
 
+; 6532 (which includes system RAM)
 KBDORA = $A400           ;6532 Output register A (Keyboard columns)
 KBDORB = $A402           ;6532 Output register B (Keyboard rows)
-
 DSPBUF = $A640			;6532 System RAM: Display Buffer
 DIGIT2 = $A644
 DIGIT1 = $A645
 
+; VIA (6522) #2
 V2T2CL = $A808           ;VIA 2 Timer 2 Write Latch / Read Counter Low byte
-VI2ACR = $A80B
-VI2IFR = $A80D
-VI2IER = $A80E
-USRBRK = $FFF6
-RSTVEC = $FFFC
-IRQVEC = $FFFE
+V2_ACR = $A80B           ;VIA 2 Auxiliary Control Register
+V2_IFR = $A80D           ;VIA 2 Interrupt Flag Register
+V2_IER = $A80E           ;VIA 2 Interrupt Enable Register
+
+USRBRK = $FFF6           ;User break vector
+RSTVEC = $FFFC           ;Reset vector
+IRQVEC = $FFFE           ;Interrupt vector
 
 
                             * = C800
@@ -354,16 +360,16 @@ CA59   4C 0B C9             JMP JUMP00
 
 CA5C   78          SUBR99   SEI
 CA5D   A9 C0                LDA #$C0
-CA5F   8D 0B A0             STA VI1ACR
+CA5F   8D 0B A0             STA V1_ACR
 CA62   A9 00                LDA #$00
-CA64   8D 0B A8             STA VI2ACR
+CA64   8D 0B A8             STA V2_ACR
 CA67   A9 7F                LDA #$7F
-CA69   8D 0E A0             STA VI1IER
-CA6C   8D 0E A8             STA VI2IER
+CA69   8D 0E A0             STA V1_IER
+CA6C   8D 0E A8             STA V2_IER
 CA6F   A9 E0                LDA #$E0
-CA71   8D 0E A0             STA VI1IER
+CA71   8D 0E A0             STA V1_IER
 CA74   A9 A0                LDA #$A0
-CA76   8D 0E A8             STA VI2IER
+CA76   8D 0E A8             STA V2_IER
 CA79   A9 1A                LDA #$1A
 CA7B   8D 04 A0             STA V1T1CL
 CA7E   A9 41                LDA #$41
@@ -496,9 +502,9 @@ CB57   AD 10 40             LDA HUB_AS
 CB5A   10 06                BPL BRCB62
 CB5C   AD 11 40             LDA HUB_A
 CB5F   20 82 CB             JSR STOREB
-CB62   AD 0D A0   BRCB62    LDA VI1IFR
+CB62   AD 0D A0   BRCB62    LDA V1_IFR
 CB65   85 41                STA $41
-CB67   8D 0D A0             STA VI1IFR
+CB67   8D 0D A0             STA V1_IFR
 CB6A   10 3B                BPL BRCBA7
 CB6C   29 40                AND #$40
 CB6E   F0 37                BEQ BRCBA7
@@ -530,7 +536,7 @@ CB96   8D 10 40             STA HUB_AS
 CB99   8D 20 40             STA HUB_BS
 CB9C   8D 40 40             STA HUB_CS
 CB9F   A9 02                LDA #$02
-CBA1   85 3D                JSR $8972
+CBA1   85 3D                JSR BEEP 
 CBA6   60         BRCBA6    RTS
 
 CBA7   6C 2B 00   BRCBA7    JMP ($002B)
@@ -543,9 +549,9 @@ CBB2   A9 00                LDA #$00
 CBB4   85 42                STA $42
 CBB6   A9 B6                LDA #$B6
 CBB8   8D 80 40             STA HUB_DS
-CBBB   AD 0D A8   BRCBBB    LDA VI2IFR
+CBBB   AD 0D A8   BRCBBB    LDA V2_IFR
 CBBE   10 07                BPL BRCBC7
-CBC0   8D 0D A8             STA VI2IFR
+CBC0   8D 0D A8             STA V2_IFR
 CBC3   A9 00                LDA #$00
 CBC5   85 2E                STA $2E
 CBC7   AD 80 40   BRCBC7    LDA HUB_DS
