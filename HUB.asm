@@ -1,4 +1,10 @@
+HMEM00  = $06
 CMDVEC  = $22			;Command vector
+
+
+ACIAVC  = $26			;ACIA address vector
+
+HUBCHN  = $28			;Hub channel 0-5
 
 
 HUB_AS = $4010			;HUB ACIA A - Control/Status register
@@ -110,7 +116,7 @@ C88E   85 1C                STA $1C
 C890   A9 02                LDA #$02
 C892   85 29                STA $29
 C894   A9 00                LDA #$00
-C896   85 2A                STA FLAG00
+C896   85 2A                STA D_ACTV
 C898   A2 03                LDX #$03
 C89A   A0 00                LDY #$00
 C89C   A9 03       WR1      LDA #$03			;Write to all 4 ACIAs
@@ -121,13 +127,13 @@ C8A6   CA                   DEX
 C8A7   10 F3                BPL WR1
 C8A9   58                   CLI
 
-C8AA   A5 2A       MAINLP   LDA FLAG00
+C8AA   A5 2A       MAINLP   LDA D_ACTV
 C8AC   D0 0D                BNE BRC8BB
 C8AE   AD 80 40             LDA HUB_DS
 C8B1   29 01                AND #$01
 C8B3   F0 06                BEQ BRC8BB
 C8B5   AD 81 40             LDA HUB_D
-C8B8   20 5C CA             JSR SUBR99
+C8B8   20 5C CA             JSR STHTMR
 
 C8BB   78          BRC8BB   SEI
 C8BC   A5 39                LDA $39
@@ -139,7 +145,7 @@ C8C6   85 1E                STA $1E
 C8C8   E6 3B                INC $3B
 C8CA   B1 3B                LDA ($3B),Y
 C8CC   AA                   TAX
-C8CD   86 28                STX $28
+C8CD   86 28                STX HUBCHN
 C8CF   E6 3B                INC $3B
 C8D1   A5 3D                LDA $3D
 C8D3   F0 0F                BEQ BRC8E4
@@ -157,8 +163,8 @@ C8EB   25 1E                AND $1E
 C8ED   85 20                STA $20
 C8EF   A9 F0                LDA #$F0
 C8F1   25 1E                AND $1E
-C8F3   85 1E                STA $1E
-C8F5   4A                   LSR A
+C8F3   85 1E                STA $1E				; Somewhere in here, we're deriving the 'command nibble'
+C8F5   4A                   LSR A                ; which indexes CMDTAB, below
 C8F6   4A                   LSR A
 C8F7   4A                   LSR A
 C8F8   AA                   TAX
@@ -173,22 +179,22 @@ C908   20 02 CB             JSR UPDDSP
 
 C90B   4C AA C8   JUMP00    JMP MAINLP
 
-C90E   B1 C9      CMDTAB    .WORD CMD_01
-C910   B9 C9                .WORD CMD_02
-C912   C1 C9                .WORD CMD_03
-C914   C9 C9                .WORD CMD_04
-C916   D1 C9                .WORD CMD_05
-C919   DC C9                .WORD CMD_06
-C91A   F3 C9                .WORD CMD_08
-C91C   03 CA                .WORD CMD_0A
-C91E   07 CA                .WORD CMD_0B
-C920   0F CA                .WORD CMD_0C
-C922   17 CA                .WORD CMD_0D
-C924   1F CA                .WORD CMD_0E
-C926   2A CA                .WORD CMD_0F
-C928   3A CA                .WORD CMD_10
-C92A   42 CA                .WORD CMD_11
-C92C   4A CA                .WORD CMD_12
+C90E   B1 C9      CMDTAB    .WORD CMD_00       ;Set write address LO nibble
+C910   B9 C9                .WORD CMD_01       ;Set write address MID nibble
+C912   C1 C9                .WORD CMD_02       ;Set write address HI nibble
+C914   C9 C9                .WORD CMD_03	      ;Write lo nibble of byte to write address
+C916   D1 C9                .WORD CMD_04       ;Write hi nibble of byte to write address
+C918   DC C9                .WORD CMD_05
+C91A   F3 C9                .WORD CMD_06       ;Write hi nibble of byte and increment write address
+C91C   03 CA                .WORD CMD_07       ;NOP
+C91E   07 CA                .WORD CMD_08       ;Set read address LO nibble
+C920   0F CA                .WORD CMD_09       ;Set read address MID nibble
+C922   17 CA                .WORD CMD_0A       ;Set read address HI nibble
+C924   1F CA                .WORD CMD_0B       ;Read byte
+C926   2A CA                .WORD CMD_0C       ;Read and increment read address
+C928   3A CA                .WORD CMD_0D       ;Read HUB timer lo byte
+C92A   42 CA                .WORD CMD_0E       ;Read HUB timer hi byte
+C92C   4A CA                .WORD CMD_0F       ;Start HUB timer
 
 C92E   74        DSPDAT     .BYTE $74
 C92F   1C                   .BYTE $1C
@@ -224,22 +230,22 @@ C95A   05 20                ORA $20
 C95C   91 24                STA ($24),Y
 C95E   60                   RTS
 
-C95F   B1 24     SRC95F     LDA ($24),Y
-C961   85 26                STA $26
+C95F   B1 24     PREPRD     LDA ($24),Y
+C961   85 26                STA ACIAVC
 C963   C8                   INY
 C964   B1 24                LDA ($24),Y
-C966   85 27                STA $27
+C966   85 27                STA ACIAVC+1
 C968   60                   RTS
 
-C969   A0 00     SRC969     LDY #$00
-C96B   20 5F C9             JSR SRC95F
+C969   A0 00     SNDBYT     LDY #$00
+C96B   20 5F C9             JSR PREPRD
 C96E   A0 04                LDY #$04
 C970   B1 24                LDA ($24),Y
 C972   A0 00                LDY #$00
-C974   91 26                STA ($26),Y
+C974   91 26                STA (ACIAVC),Y
 C976   60                   RTS
 
-C977   18        SRC977     CLC
+C977   18        INCADR     CLC
 C978   B1 24                LDA ($24),Y
 C97A   69 01                ADC #$01
 C97C   91 24                STA ($24),Y
@@ -251,21 +257,21 @@ C984   69 01                ADC #$01
 C986   91 24                STA ($24),Y
 C988   60         BRC988    RTS
 
-C989   A6 28      SRC989    LDX $28
+C989   A6 28      READXX    LDX HUBCHN
 C98B   A0 00                LDY #$00
-C98D   20 AA CA   BRC98D    JSR RDACIA
+C98D   20 AA CA   BRC98D    JSR RDACIA      ;Read ACIA status register
 C990   29 02                AND #$02
-C992   F0 F9                BEQ BRC98D
+C992   F0 F9                BEQ BRC98D      ;Wait for byte ready
 C994   A0 00                LDY #$00
-C996   B1 26                LDA ($26),Y
+C996   B1 26                LDA (ACIAVC),Y
 C998   A0 01                LDY #$01
 C99A   20 D5 CA             JSR WRACIA		;Write to ACIA pos 1
 C99D   60                   RTS
 
-C99E   A6 28      SRC99E    LDX $28
+C99E   A6 28      SRC99E    LDX HUBCHN
 C9A0   A0 00                LDY #$00
 C9A2   48                   PHA
-C9A3   20 AA CA   BRC9A3    JSR RDACIA
+C9A3   20 AA CA   BRC9A3    JSR RDACIA		;Read ACIA status register
 C9A6   29 02                AND #$02
 C9A8   F0 F9                BEQ BRC9A3
 C9AA   68                   PLA
@@ -274,28 +280,28 @@ C9AD   20 D5 CA             JSR WRACIA		;Write to ACIA pos 1
 C9B0   60                   RTS
 
                    ; Commands received from ACIAs
-C9B1   A0 00       CMD_01   LDY #$00
+C9B1   A0 00       CMD_00   LDY #$00          ;Set write address LO nibble
 C9B3   20 34 C9             JSR SRC934
 C9B6   4C 0B C9             JMP JUMP00
 
-C9B9   A0 00       CMD_02   LDY #$00
+C9B9   A0 00       CMD_01   LDY #$00          ;Set write address MID nibble
 C9BB   20 4E C9             JSR SRC94E
 C9BE   4C 0B C9             JMP JUMP00
 
-C9C1   A0 01       CMD_03   LDY #$01
+C9C1   A0 01       CMD_02   LDY #$01          ;Set write address HI nibble
 C9C3   20 34 C9             JSR SRC934
 C9C6   4C 0B C9             JMP JUMP00
 
-C9C9   A0 04       CMD_04   LDY #$04
+C9C9   A0 04       CMD_03   LDY #$04          ;Write lo nibble of byte to write address
 C9CB   20 34 C9             JSR SRC934
 C9CE   4C 0B C9             JMP JUMP00
 
-C9D1   A0 04       CMD_05   LDY #$04
+C9D1   A0 04       CMD_04   LDY #$04          ;Write hi nibble of byte to write address
 C9D3   20 4E C9             JSR SRC94E
-C9D6   20 69 C9             JSR SRC969
+C9D6   20 69 C9             JSR SNDBYT
 C9D9   4C 0B C9             JMP JUMP00
 
-C9DC   18          CMD_06   CLC
+C9DC   18          CMD_05   CLC               ;MYSTERY ROUTINE
 C9DD   A0 00                LDY #$00
 C9DF   B1 24                LDA ($24),Y
 C9E1   65 20                ADC $20
@@ -306,60 +312,59 @@ C9E8   A0 01                LDY #$01
 C9EA   B1 24                LDA ($24),Y
 C9EC   69 01                ADC #$01
 C9EE   91 24                STA ($24),Y
-C9F0   4C 0B C9    CMD_07   JMP JUMP00
+C9F0   4C 0B C9             JMP JUMP00
 
-C9F3   A0 04       CMD_08   LDY #$04
+C9F3   A0 04       CMD_06   LDY #$04         ;Write hi nibble of byte and incrememnt write address
 C9F5   20 4E C9             JSR SRC94E
-C9F8   20 69 C9             JSR SRC969
+C9F8   20 69 C9             JSR SNDBYT
 C9FB   A0 00                LDY #$00
-C9FD   20 77 C9             JSR SRC977
+C9FD   20 77 C9             JSR INCADR
 CA00   4C 0B C9             JMP JUMP00
 
-CA03   EA          CMD_0A   NOP
+CA03   EA          CMD_07   NOP              ;Placeholder
 CA04   4C 0B C9             JMP JUMP00
 
-CA07   A0 02       CMD_0B   LDY #$02
+CA07   A0 02       CMD_08   LDY #$02         ;Set read address LO nibble
 CA09   20 34 C9             JSR SRC934
 CA0C   4C 0B C9             JMP JUMP00
 
-CA0F   A0 02       CMD_0C   LDY #$02
+CA0F   A0 02       CMD_09   LDY #$02         ;Set read address MID nibble
 CA11   20 4E C9             JSR SRC94E
 CA14   4C 0B C9             JMP JUMP00
 
-CA17   A0 03       CMD_0D   LDY #$03
+CA17   A0 03       CMD_0A   LDY #$03         ;Set read address HI nibble
 CA19   20 34 C9             JSR SRC934
 CA1C   4C 0B C9             JMP JUMP00
 
-CA1F   A0 02       CMD_0E   LDY #$02
-CA21   20 5F C9             JSR SRC95F
-CA24   20 89 C9             JSR SRC989
+CA1F   A0 02       CMD_0B   LDY #$02          ; Read byte
+CA21   20 5F C9             JSR PREPRD
+CA24   20 89 C9             JSR READXX
 CA27   4C 0B C9             JMP JUMP00
 
-CA2A   A0 02       CMD_0F   LDY #$02
-CA2C   20 5F C9             JSR SRC95F
-CA2F   20 89 C9             JSR SRC989
+CA2A   A0 02       CMD_0C   LDY #$02          ; Read byte and increment read address
+CA2C   20 5F C9             JSR PREPRD
+CA2F   20 89 C9             JSR READXX
 CA32   A0 02                LDY #$02
-CA34   20 77 C9             JSR SRC977
+CA34   20 77 C9             JSR INCADR
 CA37   4C 0B C9             JMP JUMP00
 
-CA3A   A5 00       CMD_10   LDA $00
+CA3A   A5 00       CMD_0D   LDA $00           ; Read HUB timer lo
 CA3C   20 9E C9             JSR SRC99E
 CA3F   4C 0B C9             JMP JUMP00
 
-CA42   A5 01       CMD_11   LDA $01
+CA42   A5 01       CMD_0E   LDA $01           ; Read HUB timer hi
 CA44   20 9E C9             JSR SRC99E
 CA47   4C 0B C9             JMP JUMP00
 
-CA4A   A5 20       CMD_12   LDA $20
+CA4A   A5 20       CMD_0F   LDA $20           ; Start HUB timer
 CA4C   C9 01                CMP #$01
 CA4E   D0 06                BNE BRCA56
-CA50   20 8F CA             JSR SRCA8F
+CA50   20 8F CA             JSR CLRDSP
 CA53   4C 0B C9             JMP JUMP00
-
-CA56   20 5C CA    BRCA56   JSR SUBR99
+CA56   20 5C CA    BRCA56   JSR STHTMR
 CA59   4C 0B C9             JMP JUMP00
 
-CA5C   78          SUBR99   SEI
+CA5C   78          STHTMR   SEI
 CA5D   A9 C0                LDA #$C0
 CA5F   8D 0B A0             STA V1_ACR
 CA62   A9 00                LDA #$00
@@ -378,10 +383,10 @@ CA80   8D 05 A0             STA V1T1CL+1
 CA83   A9 B6                LDA #$B6
 CA85   8D 80 40             STA HUB_DS
 CA88   A9 FF                LDA #$FF
-CA8A   85 2A                STA FLAG00
+CA8A   85 2A                STA D_ACTV
 CA8C   8D 81 40             STA HUB_D
 
-CA8F   78         SRCA8F    SEI
+CA8F   78         CLRDSP    SEI
 CA90   A9 00                LDA #$00
 CA92   85 00                STA $00
 CA94   85 01                STA $01
