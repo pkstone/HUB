@@ -49,6 +49,8 @@ OU_BUF  = $3B            ;  Keeps track of processed bytes
 
 DSTATX  = $3E           ; copy of last ACIA channel D status
 
+TPAUSE  = $42           ;Boolean: in 'pause' state of HUB memory copy?
+
 
                         ;----------  'HUB' SHARED MEMORY
 
@@ -115,9 +117,9 @@ C826   85 2D                STA HCPY_F
 C828   85 2E                STA HX_PTR
 C82A   85 39                STA IN_BUF
 C82C   85 3B                STA OU_BUF
-C82E   85 3D                STA $3D
+C82E   85 3D                STA IN_BLOC
 C830   85 25                STA $25
-C832   85 42                STA $42
+C832   85 42                STA TPAUSE
 C834   A9 02                LDA #$02
 C836   85 3A                STA $3A
 C838   85 3C                STA $3C
@@ -170,53 +172,53 @@ C896   85 2A                STA D_ACTV
 
 C898   A2 03                LDX #$03            ;Write to all 4 ACIA status registers
 C89A   A0 00                LDY #ACSTAT
-C89C   A9 03       WR1      LDA #$03
-C89E   20 D5 CA             JSR WRACIA          ;Write to ACIA pos (X)
-C8A1   A9 95                LDA #$95
-C8A3   20 D5 CA             JSR WRACIA
+C89C   A9 03       WR1      LDA #$03            ;Master reset
+C89E   20 D5 CA             JSR WRACIA          ;Write to ACIA channel (X)
+C8A1   A9 95                LDA #$95            ; /16 = 9600 baud, 8 bits + 1 stop bit, 
+C8A3   20 D5 CA             JSR WRACIA          ;   receive interrupt enabled
 C8A6   CA                   DEX
 C8A7   10 F3                BPL WR1
 C8A9   58                   CLI
 
                    ;BEGIN MAIN LOOP
                   
-C8AA   A5 2A       MAINLP   LDA D_ACTV           ;Already reading from ACIA D (external HUB)?
+C8AA   A5 2A       MAINLP   LDA D_ACTV           ;ACIA D already active? (external HUB)
 C8AC   D0 0D                BNE BRC8BB           ;Yes -- skip past ACIA D polling-for-start
 C8AE   AD 80 40             LDA HUB_DS           ;NO: see if start byte is ready now
 C8B1   29 01                AND #$01             ;Receive data register full on ACIA D?
 C8B3   F0 06                BEQ BRC8BB           ;No -- skip ahead
 C8B5   AD 81 40             LDA HUB_D            ;Yes: grab the data from ACIA D
-C8B8   20 5C CA             JSR STHTMR           ; and start the HUB timer
+C8B8   20 5C CA             JSR STHTMR           ; and start the HUB timer (and copy process)
 C8BB   78          BRC8BB   SEI
-C8BC   A5 39                LDA IN_BUF
+C8BC   A5 39                LDA IN_BUF           ;Any incoming data from ACIA(s) to process?
 C8BE   C5 3B                CMP OU_BUF
-C8C0   F0 45                BEQ MLOOPX
-C8C2   A0 00                LDY #$00
-C8C4   B1 3B                LDA (OU_BUF),Y
+C8C0   F0 45                BEQ MLOOPX           ;No: skip to end of main loop
+C8C2   A0 00                LDY #$00             ;Yes: read it in to the appropriate place in HUB memory
+C8C4   B1 3B                LDA (OU_BUF),Y       ; Get data byte
 C8C6   85 1E                STA INBYTE
 C8C8   E6 3B                INC OU_BUF
-C8CA   B1 3B                LDA (OU_BUF),Y
-C8CC   AA                   TAX
-C8CD   86 28                STX HUBCHN
+C8CA   B1 3B                LDA (OU_BUF),Y       ;Get HUB channel
+C8CC   AA                   TAX                  ; stash it in X
+C8CD   86 28                STX HUBCHN           ; and in var
 C8CF   E6 3B                INC OU_BUF
-C8D1   A5 3D                LDA $3D
-C8D3   F0 0F                BEQ BRC8E4
-C8D5   C6 3D                DEC $3D
+C8D1   A5 3D                LDA IN_BLOC          ;Read interrupts disabled (to catch up)?
+C8D3   F0 0F                BEQ BRC8E4           ;No: skip to processing command from queue 
+C8D5   C6 3D                DEC IN_BLOC
 C8D7   D0 0B                BNE BRC8E4
-C8D9   A9 95                LDA #$95              ;Configure ACIAs: baud rate, byte format, interrupt enable
-C8DB   8D 10 40             STA HUB_AS
+C8D9   A9 95                LDA #$95             ;Re-enable read interrupts
+C8DB   8D 10 40             STA HUB_AS           ; (and set /16 (9600 baud)) on ACIAs A,B and C
 C8DE   8D 20 40             STA HUB_BS
 C8E1   8D 40 40             STA HUB_CS
 C8E4   58          BRC8E4   CLI
-C8E5   B5 06                LDA HMEM00,X          ;Get the base address for this Hub channel's alloted memory
+C8E5   B5 06                LDA HMEM00,X         ;Get the base address for this Hub channel's alloted memory
 C8E7   85 24                STA ADRPTR
 C8E9   A9 0F                LDA #$0F
 C8EB   25 1E                AND INBYTE
-C8ED   85 20                STA DATA              ;Data nibble from incoming Command/Data byte
+C8ED   85 20                STA DATA             ;Data nibble from incoming Command/Data byte
 C8EF   A9 F0                LDA #$F0
 C8F1   25 1E                AND INBYTE
-C8F3   85 1E                STA INBYTE            ; Shift the 'command nibble' into place
-C8F5   4A                   LSR A                 ; which indexes CMDTAB, below
+C8F3   85 1E                STA INBYTE           ; Shift the 'command nibble' into place
+C8F5   4A                   LSR A                ; which indexes CMDTAB, below
 C8F6   4A                   LSR A
 C8F7   4A                   LSR A
 C8F8   AA                   TAX
@@ -418,9 +420,9 @@ CA59   4C 0B C9             JMP JUMP00
                    ;Start HUB timer and enable interrupts from channel D (external copy)
 CA5C   78          STHTMR   SEI
 CA5D   A9 C0                LDA #$C0
-CA5F   8D 0B A0             STA V1_ACR
+CA5F   8D 0B A0             STA V1_ACR       ;V1 Timer 1 is free-running
 CA62   A9 00                LDA #$00
-CA64   8D 0B A8             STA V2_ACR
+CA64   8D 0B A8             STA V2_ACR       ;V2 Timer 1 is one-shot
 CA67   A9 7F                LDA #$7F
 CA69   8D 0E A0             STA V1_IER
 CA6C   8D 0E A8             STA V2_IER
@@ -428,12 +430,12 @@ CA6F   A9 E0                LDA #$E0
 CA71   8D 0E A0             STA V1_IER
 CA74   A9 A0                LDA #$A0
 CA76   8D 0E A8             STA V2_IER
-CA79   A9 1A                LDA #$1A          ;Set VIA #1 Timer 1 to $411A (approx. 60 Hz)
+CA79   A9 1A                LDA #$1A          ;Set V1 Timer 1 to $411A (16.667 mSecs, or 60 Hz)
 CA7B   8D 04 A0             STA V1T1CL
 CA7E   A9 41                LDA #$41
 CA80   8D 05 A0             STA V1T1CL+1
-CA83   A9 B6                LDA #$B6          ;Set config. and enable interrupt
-CA85   8D 80 40             STA HUB_DS        ; on ACIA D (external HUB channel)
+CA83   A9 B6                LDA #$B6          ;Config. ACIA D: /64 (2400 baud) - 8 bits + 1 stop bit,
+CA85   8D 80 40             STA HUB_DS        ;  enable receive AND transmit interrupts 
 CA88   A9 FF                LDA #$FF
 CA8A   85 2A                STA D_ACTV
 CA8C   8D 81 40             STA HUB_D         ; Send "initiator" byte to other HUB to start copy process
@@ -562,7 +564,7 @@ CB5C   AD 11 40             LDA HUB_A      ; Yes: grab it
 CB5F   20 82 CB             JSR STOREB
 CB62   AD 0D A0   BRCB62    LDA V1_IFR     ; Is this a V1 timer interrupt?
 CB65   85 41                STA V1IFLG
-CB67   8D 0D A0             STA V1_IFR     ; Clear all bits in IFR
+CB67   8D 0D A0             STA V1_IFR     ; Clear all bits in V1 IFR
 CB6A   10 3B                BPL GOJUMP
 CB6C   29 40                AND #$40       ; Timeout of timer 1?
 CB6E   F0 37                BEQ GOJUMP
@@ -586,71 +588,71 @@ CB87   91 39                STA (IN_BUF),Y     ; and the channel it came from
 CB89   E6 39                INC IN_BUF
 CB8B   A5 39                LDA IN_BUF
 CB8D   18                   CLC
-CB8E   69 10                ADC #$10
+CB8E   69 10                ADC #$10           ;Check to see if we're not keeping up with incoming
 CB90   C5 3B                CMP OU_BUF
-CB92   D0 12                BNE BRCBA6
-CB94   A9 55                LDA #$55           ; Clear all ACIA interrupts (I think!??)
-CB96   8D 10 40             STA HUB_AS
+CB92   D0 12                BNE BRCBA6         ; Everything's ok -- keep going
+CB94   A9 55                LDA #$55           ;We're falling behind against incoming data:
+CB96   8D 10 40             STA HUB_AS         ; temporarily disable ACIA A,B and C read interrupts
 CB99   8D 20 40             STA HUB_BS
 CB9C   8D 40 40             STA HUB_CS
-CB9F   A9 02                LDA #$02
-CBA1   85 3D                STA $3D
-CBA3   20 72 89             JSR BEEP         ;SYM monitor call
+CB9F   A9 02                LDA #$02           ;Keep 'em disabled for 2 main loops
+CBA1   85 3D                STA IN_BLOC
+CBA3   20 72 89             JSR BEEP           ;Make a beep to signal overrun
 CBA6   60         BRCBA6    RTS
 
 CBA7   6C 2B 00   GOJUMP    JMP (BVECTR)		;This jumps to 'HUBCPY' just below
 
                   ;Read in copy of external HUB data page - and write out copy of local page to external HUB
-CBAA   A5 41      HUBCPY    LDA V1IFLG       ;Check flags from last VIA #1 interrupt
-CBAC   10 0D                BPL BRCBBB
-CBAE   29 20                AND #$20
-CBB0   F0 09                BEQ BRCBBB
-CBB2   A9 00                LDA #$00
-CBB4   85 42                STA $42
-CBB6   A9 B6                LDA #$B6
-CBB8   8D 80 40             STA HUB_DS
-CBBB   AD 0D A8   BRCBBB    LDA V2_IFR       ;Interrupt on VIA #2?
+CBAA   A5 41      HUBCPY    LDA V1IFLG        ;Check flags from last VIA #1 interrupt
+CBAC   10 0D                BPL BRCBBB        ; no interrupt -- skip ahead
+CBAE   29 20                AND #$20          ; V1 timer 2 interrupt?
+CBB0   F0 09                BEQ BRCBBB        ; no -- skip ahead
+CBB2   A9 00                LDA #$00          ; yes: end PAUSE of memory copy
+CBB4   85 42                STA TPAUSE
+CBB6   A9 B6                LDA #$B6          ;Config. ACIA D: x/64 (2400 baud) - 8 bits + 1 stop bit,
+CBB8   8D 80 40             STA HUB_DS        ;  enable receive AND transmit interrupts 
+CBBB   AD 0D A8   BRCBBB    LDA V2_IFR        ;Interrupt on V2? (HubCopy Timeout)
 CBBE   10 07                BPL BRCBC7
 CBC0   8D 0D A8             STA V2_IFR
-CBC3   A9 00                LDA #$00          ;Yes: read from external HUB
+CBC3   A9 00                LDA #$00          ;Yes: reset HUB-copy write pointer to beginning of page
 CBC5   85 2E                STA HX_PTR
 CBC7   AD 80 40   BRCBC7    LDA HUB_DS        ;Check if there's an incoming byte from remote HUB data
 CBCA   85 3E                STA DSTATX        ;  (a.k.a channel D)
-CBCC   10 18                BPL BRCBE6        ;None ready
+CBCC   10 18                BPL HCPYOU        ;None ready
 CBCE   29 01                AND #$01
-CBD0   F0 14                BEQ BRCBE6
+CBD0   F0 14                BEQ HCPYOU
 CBD2   AD 81 40             LDA HUB_D         ;One *is* ready - read it in
 CBD5   A4 2E                LDY HX_PTR
 CBD7   99 00 04             STA HX_MEM,Y      ;Stash it...
 CBDA   E6 2E                INC HX_PTR        ; and increment the pointer
-CBDC   A9 D2                LDA #$D2          ;Set VIA #2 Timer 2 to $30D2 (approx. 80 Hz)
+CBDC   A9 D2                LDA #$D2          ;reset V2 Timer 2 (HubCopy Timeout) to $30D2 (12.498 mSec)
 CBDE   8D 08 A8             STA V2T2CL
 CBE1   A9 30                LDA #$30
 CBE3   8D 09 A8             STA V2T2CL+1
-CBE6   A5 3E      BRCBE6    LDA DSTATX        ;Get last ACIA D status
+CBE6   A5 3E      HCPYOU    LDA DSTATX        ;Get last ACIA D status
 CBE8   10 92                BPL IRQOUT        ; If no interrrupt request, skip out
 CBEA   29 02                AND #$02          ; If not 'Transmit Data Register Empty'
 CBEC   F0 8E                BEQ IRQOUT        ;     -- skip out
-CBEE   24 42                BIT $42           ; If $42 does not have hi bit set
+CBEE   24 42                BIT TPAUSE           ; If in 'pause' state of mem. copy
 CBF0   30 8A                BMI IRQOUT        ;     -- skip out
-CBF2   A4 2D                LDY HCPY_F        ; Get current copy (from) pointer
-CBF4   E6 2D                INC HCPY_F        ; Increment copy from pointer
+CBF2   A4 2D                LDY HCPY_F        ; Get current copy-from pointer
+CBF4   E6 2D                INC HCPY_F        ; Increment copy-from pointer
 CBF6   D0 13                BNE BRCC0B        ; If no page wrap, skip to writing byte out
 
-CBF8   A9 5E                LDA #$5E         ;Set VIA #1 Timer 2 to $515E (approx. 48 Hz)
-CBFA   8D 08 A0             STA V1T2CL
+CBF8   A9 5E                LDA #$5E          ;At page wrap: go into 21 mSec pause, for synchronization
+CBFA   8D 08 A0             STA V1T2CL        ;Set VIA #1 Timer 2 to $515E (20.830 mSec)
 CBFD   A9 51                LDA #$51
 CBFF   8D 09 A0             STA V1T2CL+1
 CC02   A9 FF                LDA #$FF
-CC04   85 42                STA $42
-CC06   A9 96                LDA #$96          ;Enable interrupts on ACIA D
+CC04   85 42                STA TPAUSE
+CC06   A9 96                LDA #$96          ;Enable RECEIVE but NOT TRANSMIT interrupts on ACIA D
 CC08   8D 80 40             STA HUB_DS
 
 CC0B   B9 00 03   BRCC0B    LDA HL_MEM,Y
-CC0E   8D 81 40             STA HUB_D        ;Write current 'copy' byte to ACIA D (remote HUB)
+CC0E   8D 81 40             STA HUB_D         ;Write current 'copy' byte to ACIA D (remote HUB)
 CC11   4C 7C CB             JMP IRQOUT
 
-CC14   E6 38      SCAN_D    INC $38          ;Scan the display (? Not totally sure what else it does)
+CC14   E6 38      SCAN_D    INC $38           ;Scan the display (? Not totally sure what else it does)
 CC16   A5 38                LDA $38
 CC18   C9 3C                CMP #$3C
 CC1A   90 2A                BCC BRCC46
@@ -685,7 +687,7 @@ CC52   10 F4                BPL BRCC48
 CC54   60                   RTS
 
 
-
+                  ;Reset ALL ACIAs
 CC55   A9 03      RSTTRG    LDA #$03
 CC57   8D 10 40             STA HUB_AS
 CC5A   8D 20 40             STA HUB_BS
