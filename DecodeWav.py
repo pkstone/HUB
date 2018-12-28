@@ -2,7 +2,7 @@ import os
 import struct
 from os.path import join
 
-audio_file = '/Users/ps/Desktop/HubROM.wav'
+audio_file = 'HubROM.wav'
 sign = lambda word: (1, -1)[word < 0]
 
 def decode_wav(filename):
