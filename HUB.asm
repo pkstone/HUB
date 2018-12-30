@@ -1,12 +1,15 @@
+     processor 6502
+     
 ;SYM-HUB: maintain 2-way communication with 4 ACIAs
-
+* = $C800
+            
 ;---------   CONSTANTS
 ;OFFSETS into 5-byte read/write info:
-    WRI_PT  = $00           ;WRITE_PTR(2 bytes)
-    REA_PT  = $02           ;READ_PTR(2 bytes)
-    DAT_PT  = $04           ;Data
-    ACSTAT  = $00           ; ACIA register offsets
-    ACDATA  = $01
+WRI_PT  = $00           ;WRITE_PTR(2 bytes)
+REA_PT  = $02           ;READ_PTR(2 bytes)
+DAT_PT  = $04           ;Data
+ACSTAT  = $00           ; ACIA register offsets
+ACDATA  = $01
 
 ;----------   ZERO PAGE VARIABLES
 HTIMER  = $00           ; HUB timer: 60Hz 16-count since start or reset                        
@@ -29,7 +32,9 @@ READVC  = $002F         ;ACIA Read vector (2 bytes)
 WRITVC  = $0031         ;ACIA Write vector (2 bytes)
 IN_BUF  = $39           ;Incoming bytes (and associated channel) from ACIA interrupts stored here
 OU_BUF  = $3B           ;  Keeps track of processed bytes
+IN_BLOC = $3D           ;Block incoming data? (overrun)
 DSTATX  = $3E           ; copy of last ACIA channel D status
+V1IFLG  = $41           ; copy of last VIA #1 interrupt flags
 TPAUSE  = $42           ;Boolean: in 'pause' state of HUB memory copy?
 
 ;----------  'HUB' SHARED MEMORY
@@ -45,7 +50,11 @@ HUB_CS = $4040           ;HUB ACIA C - Control/Status register
 HUB_C  = $4041           ;HUB ACIA C - Data register
 HUB_DS = $4080           ;HUB ACIA D - Control/Status register
 HUB_D  = $4081           ;HUB ACIA D - Data register
-BEEP   = $8972           ; SYM Monitor subroutine
+
+BEEP   = $8972           ; SYM Monitor subroutines
+CONFIG = $89A5
+ACCESS = $8B86
+SEGSM1 = $8C29           ; SYM display
 
 ;---------  VIA (6522) #1
 V1T1CL = $A004           ;VIA 1 Timer 1 Write Latch / Read Counter Low byte
@@ -69,7 +78,6 @@ RSTVEC = $FFFC           ;Reset vector
 IRQVEC = $FFFE           ;Interrupt vector
 
 
-            * = C800
             SEI
             JSR ACCESS
             LDA RSTVEC
@@ -116,9 +124,9 @@ SETDSP      LDA DSPDAT,X       ;Set display to 'Hub 3.1'
             LDA #>HUBCPY 
             STA BVECTR+1
             LDA #<IRQSRV
-            STA IRQVCL
-            LDA #>IQRSRV
-            STA IRQVCH
+            STA IRQVEC
+            LDA #>IRQSRV
+            STA IRQVEC+1
             LDA #MPTR_A
             STA HMEM00
             LDA #MPTR_B
@@ -186,9 +194,9 @@ BRC8E4      CLI
             LDA #$F0
             AND INBYTE
             STA INBYTE           ; Shift the 'command nibble' into place
-            LSR A                ; which indexes CMDTAB, below
-            LSR A
-            LSR A
+            LSR                  ; which indexes CMDTAB, below
+            LSR
+            LSR
             TAX
             LDA CMDTAB,X
             STA CMDVEC
@@ -236,7 +244,7 @@ SETHIX      CLC                ;Set HI nibble
             LDA (ADRPTR),Y
             AND #$F0
             ORA DATA
-            ADC #<HL_MEM       ;Hub memory is at $300
+            ADC #>HL_MEM       ;Hub memory is at $300
             STA (ADRPTR),Y
             RTS
 
@@ -275,11 +283,11 @@ INCADR      CLC
             LDA (ADRPTR),Y
             ADC #$01
             STA (ADRPTR),Y
- BRC988     RTS
+BRC988      RTS
 
- READXX     LDX HUBCHN       ;Read data byte from current MEMORY address
+READXX      LDX HUBCHN       ;Read data byte from current MEMORY address
             LDY #ACSTAT      ; and write it to requesting HUB channel
- BRC98D     JSR RDACIA       ;Wait for that ACIA to be ready to transmit
+BRC98D      JSR RDACIA       ;Wait for that ACIA to be ready to transmit
             AND #$02
             BEQ BRC98D
             LDY #$00
@@ -424,7 +432,7 @@ BRCAA2      STA DSPBUF,X
 ; Read byte from HUB channel (X) ACIA, register (Y)
 RDACIA      TXA
             PHA
-            ASL A
+            ASL
             TAX
             LDA HBRADR,X
             STA READVC
@@ -450,7 +458,7 @@ HUBR3       LDA HUB_DS,Y
 WRACIA      PHA
             TXA
             PHA
-            ASL A
+            ASL
             TAX
             LDA HBWADR,X
             STA WRITVC

@@ -5,7 +5,7 @@ from os.path import join
 audio_file = 'HubROM.wav'
 sign = lambda word: (1, -1)[word < 0]
 
-def decode_wav(filename):
+def decode_wav(filename, binary):
     samples_between_zerocross = 0
     current_sign = 1
     ignore_next = False
@@ -15,6 +15,8 @@ def decode_wav(filename):
     ignore_header = True
     header_skip_bytes = 5
     row_count = 0
+    out_bytes = []
+    byte_count = 1126     #Now that we know where the code ends, we can do this
     
     with open(filename, mode="rb") as f:
         word = 0
@@ -44,11 +46,22 @@ def decode_wav(filename):
                         bit_count += 1
                         if bit_count == 8:
                             if not ignore_header and not header_skip_bytes:
-                                print ('{0:0{1}X}'.format(next_byte,2), end =" ")
-                                row_count += 1
-                                if row_count > 15:
-                                    print ('')
-                                    row_count = 0
+                                # Write byte out to array or console
+                                if binary:
+                                    # Write byte out to binary array
+                                    out_bytes.append(next_byte)
+                                else:
+                                    # Write byte out console
+                                    print ('{0:0{1}X}'.format(next_byte,2), end =" ")
+                                    row_count += 1
+                                    if row_count > 15:
+                                        print ('')
+                                        row_count = 0
+
+                                byte_count -= 1
+                                if byte_count == 0:
+                                    # End of 'interesting' data reached
+                                    break
                             else:
                                 if not ignore_header:
                                     header_skip_bytes -= 1;
@@ -61,11 +74,21 @@ def decode_wav(filename):
             else:
                 samples_between_zerocross += 1
 
+        # We're here after breaking out of read loop
+        if binary:
+            newFile = open("HUBROM.bin", "wb")
+            outFileBytes = bytes(out_bytes)
+            newFile.write(outFileBytes)
+
 
 def getWord(file):
-    read_tuple = struct.unpack('h', file.read(2))
+    try:
+        read_tuple = struct.unpack('h', file.read(2))
+    except (struct.error):
+        # ignore error at EOF, as we won't get here
+        return 0
     return read_tuple[0]
 
 
 
-decode_wav(audio_file)
+decode_wav(audio_file, True)
