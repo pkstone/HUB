@@ -12,15 +12,10 @@ const unsigned int start_address = 0x200;
 const int delay_period_1 = 255;   // 255 uSecs -- SYM HS cassette timing
 const int delay_period_2 = 450;   // 450 uSecs
 
-byte dataBlock[] = {
-                    0XAD, 0X4A, 0XA6, 0X8D, 0X00, 0X03, 0XAD, 0X4B,
-                    0XA6, 0X8D, 0X01, 0X03, 0XAD, 0X4C, 0XA, 0X8D,
-                    0X02, 0X03, 0XAD, 0X4D, 0XA6, 0X8D, 0X03, 0X03,
-                    0X00, 0X00
-                   };
-
-int dataSize = sizeof(dataBlock);
-const unsigned int end_address = start_address + dataSize;
+unsigned int end_address;
+byte sizeLo = 0;
+int sizeHi = 0;
+int datasize = 0;
 
 int checksum = 0;
 int dataBytePointer = 0;
@@ -31,13 +26,22 @@ void setup() {
   // set the digital pin as output:
   pinMode(outPin, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
-
   Serial.begin(9600);   // open USB port
-  // Serial.write(dataSize);
+}
 
-  // TODO: Wait for serial input; fill dataBlock with incoming bytes
+void loop() {
+  // Get size bytes
+  sizeLo = getSerialByte();  
+  sizeHi = getSerialByte();
+  datasize = ((int)sizeHi << 8) + sizeLo;
+  end_address = start_address + datasize;
 
-  digitalWrite(LED_BUILTIN, HIGH);
+  byte dataBlock[datasize];
+
+  // Get the data
+  for (int i = 0; i < datasize; i++) {
+    dataBlock[i] = getSerialByte();
+  }
 
   // Write 256 sync characters
   for( int i=0; i<256; i++ ) {
@@ -55,7 +59,7 @@ void setup() {
   writeWord(end_address);
 
   // Write the data block
-  for (int i=0; i<dataSize; i++) {
+  for (int i=0; i<datasize; i++) {
     writeByte(dataBlock[i]);
   }
 
@@ -69,13 +73,7 @@ void setup() {
   writeByteNoChecksum(end_of_tape);
   writeByteNoChecksum(end_of_tape);
 
-  // clear LED (testing only)
-  digitalWrite(LED_BUILTIN, LOW);
   digitalWrite(outPin, LOW);
-
-}
-
-void loop() {     // NO LOOP FOR THIS PROGRAM
 }
 
 void writeWord(unsigned int word) {
@@ -99,8 +97,6 @@ void writeByteNoChecksum(byte inByte) {
 }
 
 void writeBoth(byte inByte) {
-  //Serial.write(inByte);
-
   // 8 data bits, plus one start bit (equal to 0)
   for (int i=0; i<8; i++ ) {
     writeBit( inByte & B00000001 );
@@ -120,4 +116,28 @@ void writeBit( bool notZero ) {
 
 void toggleOutput() {
   digitalWrite(outPin, !digitalRead(outPin));
+}
+
+byte getSerialByte() {
+  while (!Serial.available());
+  return Serial.read(); 
+}
+
+void signalWithLED() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(250);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(250);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(250);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(250);
 }
