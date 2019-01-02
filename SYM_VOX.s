@@ -1,5 +1,5 @@
 ------- FILE SYM_VOX.asm LEVEL 1 PASS 2
-      1  032a					      processor	6502
+      1  0318					      processor	6502
       2  0200				   .	      =	$200
       3  0200
       4  0200
@@ -47,7 +47,7 @@
      46  0200		       8c 29	   SEGSM1     =	$8C29	; SYM display
      47  0200
      48  0200		       20 86 8b    INIT       JSR	ACCESS
-     49  0203		       20 06 03 	      JSR	SETDSP
+     49  0203		       20 f4 02 	      JSR	SETDSP
      50  0206		       a9 c0		      LDA	#$C0
      51  0208		       8d 0b a8 	      STA	ACR
      52  020b		       a9 c8		      LDA	#$C8
@@ -117,7 +117,7 @@
     116  028e		       20 88 81    GETCMD     JSR	SAVER
     117  0291		       20 06 89 	      JSR	SCAND	;Scan display once
     118  0294		       20 23 89 	      JSR	KEYQ
-    119  0297		       f0 6a		      BEQ	EXIT
+    119  0297		       f0 58		      BEQ	EXIT
     120  0299		       20 2c 89 	      JSR	LRNKEY
     121  029c		       48		      PHA
     122  029d		       20 23 89    DEBNCE     JSR	KEYQ
@@ -129,67 +129,59 @@
     128  02ab		       c9 0d		      CMP	#$0D	; < CR > = HALT
     129  02ad		       d0 05		      BNE	NEXT1
     130  02af		       85 06		      STA	STPFLG
-    131  02b1		       4c 03 03 	      JMP	EXIT
+    131  02b1		       4c f1 02 	      JMP	EXIT
     132  02b4		       c9 2d	   NEXT1      CMP	#$2D	; < - > =	tempo
     133  02b6		       d0 05		      BNE	NEXT2
     134  02b8		       a2 00		      LDX	#0	; zeroeth parameter
-    135  02ba		       4c 01 03 	      JMP	OUT
+    135  02ba		       4c ef 02 	      JMP	OUT
     136  02bd		       c9 3e	   NEXT2      CMP	#$3E	; < -> > =	pitch range
     137  02bf		       d0 05		      BNE	NEXT3
     138  02c1		       a2 05		      LDX	#5	; fifth parameter
-    139  02c3		       4c 01 03 	      JMP	OUT
+    139  02c3		       4c ef 02 	      JMP	OUT
     140  02c6		       c9 47	   NEXT3      CMP	#$47	; < GO > =	PORTHI
     141  02c8		       d0 05		      BNE	NEXT4
     142  02ca		       a2 04		      LDX	#4	; fourth parameter
-    143  02cc		       4c 01 03 	      JMP	OUT
+    143  02cc		       4c ef 02 	      JMP	OUT
     144  02cf		       c9 52	   NEXT4      CMP	#$52	; < reg > =	PORTLO
-    145  02d1		       d0 05		      BNE	NEXT5
+    145  02d1		       d0 05		      BNE	PARAM
     146  02d3		       a2 03		      LDX	#3	; third parameter
-    147  02d5		       4c 01 03 	      JMP	OUT
-    148  02d8		       c9 13	   NEXT5      CMP	#$13	; < L2 > =	DRUMHI
-    149  02da		       d0 05		      BNE	NEXT6
-    150  02dc		       a2 02		      LDX	#2	; second parameter
-    151  02de		       4c 01 03 	      JMP	OUT
-    152  02e1		       c9 1e	   NEXT6      CMP	#$1E	; < S2 > =	DRUMLO
-    153  02e3		       d0 05		      BNE	PARAM
-    154  02e5		       a2 01		      LDX	#1	; 1st parameter
-    155  02e7		       4c 01 03 	      JMP	OUT
-    156  02ea
-    157  02ea		       20 75 82    PARAM      JSR	ASCNIB
-    158  02ed		       a6 0a		      LDX	INDEX
-    159  02ef		       e0 05		      CPX	#5
-    160  02f1		       f0 0c		      BEQ	NOSHFT
-    161  02f3		       e0 04		      CPX	#4
-    162  02f5		       f0 08		      BEQ	NOSHFT
-    163  02f7		       e0 02		      CPX	#2
-    164  02f9		       f0 04		      BEQ	NOSHFT
-    165  02fb		       0a	   SHIFT      ASL
-    166  02fc		       0a		      ASL
-    167  02fd		       0a		      ASL
-    168  02fe		       0a		      ASL
-    169  02ff		       95 00	   NOSHFT     STA	VARS,X
-    170  0301		       86 0a	   OUT	      STX	INDEX
-    171  0303		       4c c4 81    EXIT       JMP	RESALL
-    172  0306
-    173  0306		       a2 03	   SETDSP     LDX	#3
-    174  0308		       bd 24 03    SETD2      LDA	DSPDAT,X	;Set display to 'Hub 3.1'
-    175  030b		       9d 40 a6 	      STA	DSPBUF,X
-    176  030e		       ca		      DEX
-    177  030f		       10 f7		      BPL	SETD2
-    178  0311		       a2 01		      LDX	#$01
-    179  0313		       bd 29 8c 	      LDA	SEGSM1,X
-    180  0316		       09 80		      ORA	#$80
-    181  0318		       8d 44 a6 	      STA	DSPBUF+4
-    182  031b		       a2 03		      LDX	#$03
-    183  031d		       bd 29 8c 	      LDA	SEGSM1,X
-    184  0320		       8d 45 a6 	      STA	DSPBUF+5
-    185  0323		       60		      RTS
-    186  0324
-    187  0324		       74	   DSPDAT     .BYTE.b	$74	;Codes for "hub 3.1" message on display
-    188  0325		       1c		      .BYTE.b	$1C
-    189  0326		       7c		      .BYTE.b	$7C
-    190  0327		       00		      .BYTE.b	$00
-    191  0328		       86		      .BYTE.b	$86
-    192  0329		       bb		      .BYTE.b	$BB
-    193  032a
-    194  032a					      .END
+    147  02d5		       4c ef 02 	      JMP	OUT
+    148  02d8
+    149  02d8		       20 75 82    PARAM      JSR	ASCNIB
+    150  02db		       a6 0a		      LDX	INDEX
+    151  02dd		       e0 05		      CPX	#5
+    152  02df		       f0 0c		      BEQ	NOSHFT
+    153  02e1		       e0 04		      CPX	#4
+    154  02e3		       f0 08		      BEQ	NOSHFT
+    155  02e5		       e0 02		      CPX	#2
+    156  02e7		       f0 04		      BEQ	NOSHFT
+    157  02e9		       0a	   SHIFT      ASL
+    158  02ea		       0a		      ASL
+    159  02eb		       0a		      ASL
+    160  02ec		       0a		      ASL
+    161  02ed		       95 00	   NOSHFT     STA	VARS,X
+    162  02ef		       86 0a	   OUT	      STX	INDEX
+    163  02f1		       4c c4 81    EXIT       JMP	RESALL
+    164  02f4
+    165  02f4		       a2 03	   SETDSP     LDX	#3
+    166  02f6		       bd 12 03    SETD2      LDA	DSPDAT,X	;Set display to 'Hub 3.1'
+    167  02f9		       9d 40 a6 	      STA	DSPBUF,X
+    168  02fc		       ca		      DEX
+    169  02fd		       10 f7		      BPL	SETD2
+    170  02ff		       a2 01		      LDX	#$01
+    171  0301		       bd 29 8c 	      LDA	SEGSM1,X
+    172  0304		       09 80		      ORA	#$80
+    173  0306		       8d 44 a6 	      STA	DSPBUF+4
+    174  0309		       a2 03		      LDX	#$03
+    175  030b		       bd 29 8c 	      LDA	SEGSM1,X
+    176  030e		       8d 45 a6 	      STA	DSPBUF+5
+    177  0311		       60		      RTS
+    178  0312
+    179  0312		       74	   DSPDAT     .BYTE.b	$74	;Codes for "hub 3.1" message on display
+    180  0313		       1c		      .BYTE.b	$1C
+    181  0314		       7c		      .BYTE.b	$7C
+    182  0315		       00		      .BYTE.b	$00
+    183  0316		       86		      .BYTE.b	$86
+    184  0317		       bb		      .BYTE.b	$BB
+    185  0318
+    186  0318					      .END
