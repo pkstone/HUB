@@ -1,8 +1,11 @@
+;SYM memory player (scans parts of memory and 'plays' through PB7)
+
+
          processor 6502
 * = $200
 
- 
-;SYM memory player (scans parts of memory and 'plays' through PB7)
+;---------  CONSTANTS
+T2_VAL = $3000          ;Set Timer 2 interval
  
 ;---------  6532 (which includes system RAM)
 KBDORA = $A400           ;6532 Output register A (Keyboard columns)
@@ -15,22 +18,27 @@ T1LL   = $A806
 T1CH   = $A805
 ACR    = $A80B
 IFR    = $A80D
+IER    = $A80E
 T2LL   = $A808
 T2CH   = $A809
  
 ;------ VARIABLES
 VARS   = $00
 TEMPO  = $00
-DRUMLO = $01
-DRUMHI = $02
-PORTLO = $03
-PORTHI = $04
+PRNIBS = $01				;Four address nibbles:
+PORTN3 = $01				;Address nibbles for memory read pointer
+PORTN2 = $02
+PORTN1 = $03
+PORTN0 = $04
 RANGE  = $05
 STPFLG = $06
 RSTFLG = $07
 YPTR   = $08
-MASK   = $09
+RMASK  = $09
 INDEX  = $0A
+PORTLO = $0B
+PORTHI = $0C
+TCOUNT = $0D				;Timer interrupt count
  
 ;------ MONITOR SUBROUTINES
 RESALL = $81C4
@@ -45,10 +53,21 @@ NOBEEP = $899B
 ACCESS = $8B86
 SEGSM1 = $8C29           ; SYM display
 
-INIT			JSR ACCESS 
+USRBRK = $FFF6           ;User break vector
+IRQVEC = $FFFE           ;Interrupt vector
+
+
+INIT			SEI
+			JSR ACCESS 
 			JSR SETDSP
-			LDA #$C0
- 			STA ACR
+			LDA #<IRQSRV
+			STA IRQVEC
+			LDA #>IRQSRV
+			STA IRQVEC+1
+			LDA #$C0		;Set timer 1: free-running, output on PB7
+ 			STA ACR		;    timer 2: one-shot (will trigger interrupt)
+ 			LDA #$A0
+ 			STA IER
  			LDA #$C8
  			STA PORTHI
  			LDA #$00
@@ -58,58 +77,32 @@ INIT			JSR ACCESS
  			LDA #$0E
  			STA TEMPO
  			LDA #$40
- 			STA MASK		   ;Arbitrary rest tester: try $04
-TOP			LDA #0
+ 			STA RMASK		;Arbitrary rest tester: try $04
+ 			LDA #0			;zero the score pointer
+ 			STA YPTR
  			STA STPFLG
  			STA RSTFLG
- 			JSR KEYQ       ;Wait for a key press
- 			BEQ TOP
- 			JSR GETCMD
-NEWBAR		LDA #0
- 			STA YPTR
- 			LDY YPTR
-PLAY			LDA (PORTLO),Y	 ;Get next 'pitch'
- 			BIT MASK			 ;Arbitrary rest test
- 			BNE CONTIN			
- 			STA RSTFLG
- 			LDA #0
-CONTIN		LDY TEMPO
- 			JSR BOP
- 			JSR GETCMD
- 			LDA STPFLG
- 			BNE TOP
-NEXT			INC YPTR
- 			LDY YPTR
- 			CPY #$10				; End of bar?
- 			BEQ NEWBAR
- 			JMP PLAY				;  NO: back to top of play loop
+ 			LDA #1
+ 			STA TCOUNT
+			LDA #<T2_VAL		;Set Timer 2 (tempo) value
+			STA T2LL
+			LDA #>T2_VAL
+			STA T2CH			;and start it 			
+ 			CLI
  			
-BOP			STA T1LL
+ 			; MAIN LOOP: scan keyboard
+MLOOP		JSR GETCMD
+ 			JMP MLOOP
+
+BOP			STA T1LL				; Store low byte of freq. in timer lo latch
 			LDA RSTFLG
 			BEQ GOON
 			LDA #0
 			STA T1CH
 			STA RSTFLG
-			JMP STALL
-			
-GOON			LDA RANGE
-			STA T1CH
-STALL		LDX #$40
-WAIT			DEX
-			BNE WAIT
-TIME			LDA #$FF
-			STA T2LL				;adjustable
-			LDA #$10
-			STA T2CH				;adjustable
-			JSR GETCMD
-			LDA STPFLG
-			BNE TOP
-			LDA #$20
-WAITIR		BIT IFR
-			BNE TIME2
-			JMP WAITIR
-TIME2		DEY
-			BNE TIME
+			RTS			
+GOON			LDA RANGE			;store upper byte of timer ('pitch' range), which
+			STA T1CH				;triggers the free-running counter output on PB7
 			RTS
 			
             ; Get pressed key (if any)
@@ -137,51 +130,107 @@ NEXT2		CMP #$3E				; < -> > = 	pitch range
 			BNE NEXT3
 			LDX #5				; fifth parameter
 			JMP OUT		
-NEXT3		CMP #$47				; < GO > = 	PORTHI
+NEXT3		CMP #$47				; < GO > = 	PORTN1
 			BNE NEXT4
-			LDX #4				; fourth parameter
-			JMP OUT		
-NEXT4		CMP #$52				; < reg > = 	PORTLO
-			BNE PARAM
 			LDX #3				; third parameter
 			JMP OUT		
+NEXT4		CMP #$52				; < reg > = 	PORTN0
+			BNE NEXT5
+			LDX #4				; fourth parameter
+			JMP OUT
+NEXT5		CMP #$13				;< L2 > = PORTN3
+			BNE NEXT6
+			LDX #1				; first parameter
+			JMP OUT
+NEXT6		CMP #$1E				;< S2 > = PORTN2
+			BNE PARAM
+			LDX #2				; second parameter
+			JMP OUT
  		  
 PARAM		JSR ASCNIB
 			LDX INDEX
-			CPX #5
-			BEQ NOSHFT
-			CPX #4
-			BEQ NOSHFT
-			CPX #2
-			BEQ NOSHFT
-SHIFT		ASL
+			STA VARS,X
+			LDA PORTN1			; (re)build memory-scan pointer
 			ASL
 			ASL
 			ASL
-NOSHFT		STA VARS,X
-OUT			STX INDEX
+			ASL
+			ADC PORTN0
+			STA PORTLO
+			LDA PORTN3
+			ASL
+			ASL
+			ASL
+			ASL
+			ADC PORTN2
+			STA PORTHI
+			
+OUT			STX INDEX			
+			JSR SETDSP
 EXIT			JMP RESALL
 
+			;Display memory pointer
 SETDSP		LDX #3
-SETD2		LDA DSPDAT,X       ;Set display to 'Hub 3.1'
+SETD2		LDY PRNIBS,X
+			LDA SEGSM1,Y
 			STA DSPBUF,X
 			DEX
 			BPL SETD2
-			LDX #$01
-			LDA SEGSM1,X
-			ORA #$80
+			LDA #0
+			ORA #$80			; light up decimal point
 			STA DSPBUF+4
-			LDX #$03
-			LDA SEGSM1,X
+			LDA #0
 			STA DSPBUF+5
 			RTS
 	
-DSPDAT      .BYTE $74          ;Codes for "hub 3.1" message on display
-            .BYTE $1C
-            .BYTE $7C
-            .BYTE $00
-            .BYTE $86
-            .BYTE $BB
+; Interrupt service routine -- called by timeout of TIMER 2 (tempo timer)
+IRQSRV      PHA
+            TXA
+            PHA
+            TYA
+            PHA
+            TSX
+            LDA $0104,X
+            AND #$10
+            BEQ NOBRK
+            PLA
+            TAY
+            PLA
+            TAX
+            PLA
+            JMP (USRBRK)
 
-			.END
+NOBRK		LDA IFR
+			STA IFR			; clear interrupt
+			; Re-set the (one-shot) Timer 
+			LDA #<T2_VAL		;Set Timer 2 (tempo) value
+			STA T2LL
+			LDA #>T2_VAL
+			STA T2CH			;and re-start it
+			
+			DEC TCOUNT
+			BNE IRQOUT
+			
+			LDA TEMPO		;Reset the tempo value
+			STA TCOUNT
+PLAY			LDY YPTR
+			LDA (PORTLO),Y	;Get next 'pitch'
+ 			BIT RMASK		;Arbitrary rest test
+ 			BNE CONTIN			
+ 			STA RSTFLG
+ 			LDA #0
+CONTIN		JSR BOP
+NEXT			INC YPTR
+ 			LDY YPTR
+ 			CPY #$10				; End of bar?
+ 			BNE IRQOUT
+ 			LDY #0				; Yes: reset score pointer
+ 			STY YPTR
+ 			 			
+IRQOUT      PLA
+            TAY
+            PLA
+            TAX
+            PLA
+            RTI
 			
