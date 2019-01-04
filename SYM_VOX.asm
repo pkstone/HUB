@@ -5,11 +5,9 @@
 * = $200
 
 ;---------  CONSTANTS
-T2_VAL = $3000          ;Set Timer 2 interval
+T2_VAL = $6000          ;Timer 2 interval (tempo timer)
  
 ;---------  6532 (which includes system RAM)
-KBDORA = $A400           ;6532 Output register A (Keyboard columns)
-KBDORB = $A402           ;6532 Output register B (Keyboard rows)
 DSPBUF = $A640           ;6532 System RAM: Display Buffer
 
 
@@ -26,19 +24,25 @@ T2CH   = $A809
 VARS   = $00
 TEMPO  = $00
 PRNIBS = $01				;Four address nibbles:
-PORTN3 = $01				;Address nibbles for memory read pointer
-PORTN2 = $02
-PORTN1 = $03
-PORTN0 = $04
+PNIBN3 = $01				;  for memory read pointer
+PNIBN2 = $02
+PNIBN1 = $03
+PNIBN0 = $04
 RANGE  = $05
 STPFLG = $06
 RSTFLG = $07
 YPTR   = $08
 RMASK  = $09
 INDEX  = $0A
-PORTLO = $0B
-PORTHI = $0C
+SCANAD = $0B				;16-bt memory-scan address
+		;$0C
 TCOUNT = $0D				;Timer interrupt count
+RIFLEN = $0E				;16-bit riff length
+		;$0F
+SCORE  = $10				;16-bit score pointer
+		;$11
+SCRCTR = $12				;16-bit score counter
+		;$13
  
 ;------ MONITOR SUBROUTINES
 RESALL = $81C4
@@ -69,17 +73,24 @@ INIT			SEI
  			LDA #$A0
  			STA IER
  			LDA #$C8
- 			STA PORTHI
+ 			STA SCANAD+1
+ 			STA SCORE+1
  			LDA #$00
- 			STA PORTLO
+ 			STA SCANAD
+ 			STA SCORE
  			LDA #7
  			STA RANGE
  			LDA #$0E
  			STA TEMPO
  			LDA #$40
  			STA RMASK		;Arbitrary rest tester: try $04
- 			LDA #0			;zero the score pointer
- 			STA YPTR
+ 			LDA #16
+ 			STA RIFLEN		;Initial riff length = 16
+ 			STA SCRCTR
+ 			LDA #0
+ 			STA RIFLEN+1
+ 			STA SCRCTR+1
+ 			LDA #0
  			STA STPFLG
  			STA RSTFLG
  			LDA #1
@@ -93,7 +104,9 @@ INIT			SEI
  			; MAIN LOOP: scan keyboard
 MLOOP		JSR GETCMD
  			JMP MLOOP
-
+ 			
+ 			
+;---------- Play one note
 BOP			STA T1LL				; Store low byte of freq. in timer lo latch
 			LDA RSTFLG
 			BEQ GOON
@@ -105,12 +118,14 @@ GOON			LDA RANGE			;store upper byte of timer ('pitch' range), which
 			STA T1CH				;triggers the free-running counter output on PB7
 			RTS
 			
-            ; Get pressed key (if any)
+
+;---------- Get pressed key (if any) and process it (scan display once)
 GETCMD		JSR SAVER
 			JSR SCAND			;Scan display once
 			JSR KEYQ
-			BEQ EXIT
-			JSR LRNKEY
+			BNE GTKY
+			JMP RESALL			;No key down: restore regs. and return
+GTKY			JSR LRNKEY
 			PHA
 DEBNCE		JSR KEYQ
 			BNE DEBNCE			;Key still down? Wait longer.
@@ -121,55 +136,90 @@ PARSE		PLA
 			CMP #$0D				; < CR > = HALT
 			BNE NEXT1
 			STA STPFLG
-			JMP EXIT
+			JMP RESALL
 NEXT1		CMP #$2D				; < - > = 	tempo
 			BNE NEXT2
-			LDX #0				; zeroeth parameter
-			JMP OUT		
+			LDX #TEMPO
+			JMP SETIDX		
 NEXT2		CMP #$3E				; < -> > = 	pitch range
 			BNE NEXT3
-			LDX #5				; fifth parameter
-			JMP OUT		
-NEXT3		CMP #$47				; < GO > = 	PORTN1
+			LDX #RANGE
+			JMP SETIDX		
+NEXT3		CMP #$47				; < GO > = 	PNIBN1
 			BNE NEXT4
-			LDX #3				; third parameter
-			JMP OUT		
-NEXT4		CMP #$52				; < reg > = 	PORTN0
+			LDX #PNIBN1
+			JMP SETIDX		
+NEXT4		CMP #$52				; < reg > = 	PNIBN0
 			BNE NEXT5
-			LDX #4				; fourth parameter
-			JMP OUT
-NEXT5		CMP #$13				;< L2 > = PORTN3
+			LDX #PNIBN0
+			JMP SETIDX
+NEXT5		CMP #$13				;< L2 > = PNIBN3
 			BNE NEXT6
-			LDX #1				; first parameter
-			JMP OUT
-NEXT6		CMP #$1E				;< S2 > = PORTN2
+			LDX #PNIBN3	
+			JMP SETIDX
+NEXT6		CMP #$1E				;< S2 > = PNIBN2
+			BNE NEXT7
+			LDX #PNIBN2
+			JMP SETIDX
+NEXT7		CMP #$4D				;< MEM > = RMASK
+			BNE NEXT8
+			LDX #RMASK			; (will require processing)
+			JMP SETIDX
+NEXT8		CMP #$FF				;< SHIFT > = RIFLEN
 			BNE PARAM
-			LDX #2				; second parameter
-			JMP OUT
+			LDX #RIFLEN			; (will require processing)
+			JMP SETIDX
  		  
 PARAM		JSR ASCNIB
 			LDX INDEX
-			STA VARS,X
-			LDA PORTN1			; (re)build memory-scan pointer
-			ASL
-			ASL
-			ASL
-			ASL
-			ADC PORTN0
-			STA PORTLO
-			LDA PORTN3
-			ASL
-			ASL
-			ASL
-			ASL
-			ADC PORTN2
-			STA PORTHI
+			CPX #RMASK			; Mem key (set rest mask)?
+			BNE P1
+			TAX
+			LDA #1
+SHFT			ASL
+			DEX
+			BNE SHFT
+			STA RMASK
+			JMP RESALL
 			
-OUT			STX INDEX			
+P1			CPX #RIFLEN			; Shift key (set Riff length)
+			BNE P2
+			ASL					;double the index value
+			TAX
+			LDA RFLTAB,X
+			STA RIFLEN
+			LDA RFLTAB+1,X
+			STA RIFLEN+1
+			SEI
+			LDA #1				; Force immediate riff reset
+			STA SCRCTR
+			LDA #0
+			STA SCRCTR+1
+			CLI
+			JMP RESALL
+			
+P2			STA VARS,X
+			LDA PNIBN1			; (re)build memory-scan pointer
+			ASL
+			ASL
+			ASL
+			ASL
+			ADC PNIBN0
+			STA SCANAD
+			LDA PNIBN3
+			ASL
+			ASL
+			ASL
+			ASL
+			ADC PNIBN2
+			STA SCANAD+1
+			
+SETIDX		STX INDEX			
 			JSR SETDSP
-EXIT			JMP RESALL
+			JMP RESALL
 
-			;Display memory pointer
+
+;---------- Display memory pointer
 SETDSP		LDX #3
 SETD2		LDY PRNIBS,X
 			LDA SEGSM1,Y
@@ -183,7 +233,8 @@ SETD2		LDY PRNIBS,X
 			STA DSPBUF+5
 			RTS
 	
-; Interrupt service routine -- called by timeout of TIMER 2 (tempo timer)
+
+;---------- Interrupt service routine -- called by timeout of TIMER 2 (tempo timer)
 IRQSRV      PHA
             TXA
             PHA
@@ -213,24 +264,52 @@ NOBRK		LDA IFR
 			
 			LDA TEMPO		;Reset the tempo value
 			STA TCOUNT
-PLAY			LDY YPTR
-			LDA (PORTLO),Y	;Get next 'pitch'
+PLAY			LDY #0
+			LDA (SCORE),Y	;Get next 'pitch'
  			BIT RMASK		;Arbitrary rest test
  			BNE CONTIN			
  			STA RSTFLG
  			LDA #0
 CONTIN		JSR BOP
-NEXT			INC YPTR
- 			LDY YPTR
- 			CPY #$10				; End of bar?
+NEXT			INC SCORE
+			BNE NX1
+			INC SCORE+1
+NX1			DEC SCRCTR
  			BNE IRQOUT
- 			LDY #0				; Yes: reset score pointer
- 			STY YPTR
- 			 			
+ 			DEC SCRCTR+1
+ 			BNE IRQOUT
+ 			LDA SCANAD			; End of riff: loop back to start
+ 			STA SCORE
+ 			LDA SCANAD+1
+ 			STA SCORE+1
+ 			LDA RIFLEN
+ 			STA SCRCTR
+ 			LDA RIFLEN+1
+ 			STA SCRCTR+1
+  			 			
 IRQOUT      PLA
             TAY
             PLA
             TAX
             PLA
             RTI
+            
+RFLTAB		.WORD 2          ;Riff length table
+			.WORD 3
+			.WORD 4
+			.WORD 8
+			.WORD 12
+			.WORD 16
+			.WORD 24
+			.WORD 32
+			.WORD 64
+			.WORD 128
+			.WORD 256
+			.WORD 512
+			.WORD 1024
+			.WORD 2048
+			.WORD 4096
+			.WORD 8192 
+            
+
 			
