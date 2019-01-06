@@ -21,17 +21,18 @@ T2CH   = $A809
  
 ;------ VARIABLES
 VARS   = $00
-TEMPO  = $00
-ADNBS3 = $01				;Four address nibbles for scanning address
-ADNBS2 = $02
-ADNBS1 = $03
-ADNBS0 = $04
-RANGE  = $05				;'Pitch' range (upper byte of timer)
-STPFLG = $06
-RSTFLG = $07
+ADNBS3 = $00				;Four address nibbles for scanning address
+ADNBS2 = $01
+ADNBS1 = $02
+ADNBS0 = $03
+RANGE  = $04				;'Pitch' range (upper byte of timer)
+TEMPO  = $05
+RMASK  = $06
 
-RMASK  = $09
+STPFLG = $07
+RSTFLG = $08
 INDEX  = $0A
+
 SCANAD = $0B				;16-bt memory-scan address
 		;$0C
 TCOUNT = $0D				;Timer interrupt count
@@ -120,9 +121,9 @@ DEBNCE	JSR KEYQ
 		JSR KEYQ
 		BNE DEBNCE
 PARSE	PLA
-		CMP #$0D				; < CR > = HALT
+		CMP #$0D				; < CR > = Currently does nothing
 		BNE NEXT1
-		STA STPFLG
+		NOP
 		JMP RESALL
 NEXT1	CMP #$2D				; < - > = 	tempo
 		BNE NEXT2
@@ -169,7 +170,6 @@ P0		CPX #RMASK			; Set rest mask?
 		BNE P1
 		TAX
 		BEQ STRM
-		CLC
 		CMP #8				; If choice > 8, set mask to $FF (silence)
 		BCC SKX
 		LDA #$FF
@@ -189,7 +189,7 @@ P1		CPX #RIFLEN			; Shift key (set Riff length)
 		STA RIFLEN
 		LDA RFLTAB+1,X
 		STA RIFLEN+1
-		SEI
+FORCE	SEI
 		LDA #0				; Force immediate riff reset
 		STA SCRCTR
 		LDA #0
@@ -198,6 +198,10 @@ P1		CPX #RIFLEN			; Shift key (set Riff length)
 		JMP RESALL
 
 P2		STA VARS,X
+		CPX #ADNBS0+1		;Address change?
+		BCS SETIDX
+		
+		SEI
 		LDA ADNBS1			; (re)build memory-scan pointer
 		ASL
 		ASL
@@ -212,6 +216,7 @@ P2		STA VARS,X
 		ASL
 		ADC ADNBS2
 		STA SCANAD+1
+		JMP FORCE			; Force immediate riff reset
 
 SETIDX	STX INDEX
 		JMP RESALL
@@ -238,6 +243,7 @@ DSPBYT	PHA
 
 ;---------- Display memory pointer
 DSPPTR	LDA SCORE+1
+		PHA
 		AND #$F0
 		LSR
 		LSR
@@ -246,13 +252,14 @@ DSPPTR	LDA SCORE+1
 		TAY		
 		LDA SEGSM1,Y		
 		STA DSPBUF		
-		LDA SCORE+1
-		AND #$F0
+		PLA
+		AND #$0F
 		TAY
 		LDA SEGSM1,Y		
 		STA DSPBUF+1
 		
 		LDA SCORE
+		PHA
 		AND #$F0
 		LSR
 		LSR
@@ -261,7 +268,7 @@ DSPPTR	LDA SCORE+1
 		TAY
 		LDA SEGSM1,Y		
 		STA DSPBUF+2		
-		LDA SCORE
+		PLA
 		AND #$0F
 		TAY
 		LDA SEGSM1,Y		
@@ -330,9 +337,12 @@ PLAY		JSR DSPPTR
 		LDY #0
 		LDA (SCORE),Y		;Get next 'pitch'
 		JSR DSPBYT			;Display it
+		LDY RMASK
+		CPY #$FF				;Silence?
+		BEQ SHHH
  		BIT RMASK			;Arbitrary rest test
  		BEQ CONTIN
- 		LDA #1			
+SHHH 	LDA #1			
  		STA RSTFLG
  		LDA #0
 CONTIN	JSR BOP
@@ -352,10 +362,9 @@ IRQOUT	PLA
 		TAX
 		PLA
  		RTI
-            
-RFLTAB	.WORD 0				;Riff length table
-		.WORD 1
-		.WORD 2
+
+-------------;Riff length table            
+RFLTAB	.WORD 2
 		.WORD 3
 		.WORD 4
 		.WORD 5
@@ -363,11 +372,13 @@ RFLTAB	.WORD 0				;Riff length table
 		.WORD 8
 		.WORD 12
 		.WORD 16
-		.WORD 24
 		.WORD 32
 		.WORD 64
 		.WORD 128
+		.WORD 256
 		.WORD 512
+		.WORD 2048
+		.WORD 4096
 		.WORD 8192
 		
 		.END
