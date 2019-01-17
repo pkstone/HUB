@@ -4,3 +4,5 @@ syntax: regexp
 
 syntax: regexp
 ^\.DS_Store$
+syntax: regexp
+\.wav$
