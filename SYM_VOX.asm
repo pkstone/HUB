@@ -10,7 +10,7 @@ T2_VAL = $6000          ;Timer 2 interval (tempo timer)
 DSPBUF = $A640           ;6532 System RAM: Display Buffer
 
 
-;------ PORTS
+;--------- PORTS
 T1LL   = $A806
 T1CH   = $A805
 ACR    = $A80B
@@ -19,7 +19,7 @@ IER    = $A80E
 T2LL   = $A808
 T2CH   = $A809
  
-;------ VARIABLES
+;--------- VARIABLES
 VARS   = $00
 ADNBS3 = $00				;Four address nibbles for scanning address
 ADNBS2 = $01
@@ -43,7 +43,7 @@ SCORE  = $10				;16-bit score pointer
 SCRCTR = $12				;16-bit score counter
 		;$13
  
-;------ MONITOR SUBROUTINES
+;--------- MONITOR SUBROUTINES
 RESALL = $81C4
 SAVER  = $8188
 ASCNIB = $8275
@@ -363,7 +363,7 @@ IRQOUT	PLA
 		PLA
  		RTI
 
--------------;Riff length table            
+;--------- Riff length table            
 RFLTAB	.WORD 2
 		.WORD 3
 		.WORD 4

@@ -25,641 +25,644 @@
      24  c800		       00 24	   ADRPTR     =	$24	;Pointer to read and write pointers for each channel
      25  c800		       00 26	   MEMORY     =	$26	;Pointer into actual storage ($300-$4FF)
      26  c800		       00 28	   HUBCHN     =	$28	;Hub channel 0-3
-     27  c800		       00 2a	   D_ACTV     =	$2A
-     28  c800		       00 2b	   BVECTR     =	$2B	;two-byte jump vector
-     29  c800		       00 2d	   HCPY_F     =	$2D	;HUB copy (from) pointer
-     30  c800		       00 2e	   HX_PTR     =	$2E	;Pointer to 'external' page of Hub memory, for copying operation
-     31  c800		       00 2f	   READVC     =	$002F	;ACIA Read vector (2 bytes)
-     32  c800		       00 31	   WRITVC     =	$0031	;ACIA Write vector (2 bytes)
-     33  c800		       00 39	   IN_BUF     =	$39	;Incoming bytes (and associated channel) from ACIA interrupts stored here
-     34  c800		       00 3b	   OU_BUF     =	$3B	;  Keeps track of processed bytes
-     35  c800		       00 3d	   IN_BLOC    =	$3D	;Block incoming data? (overrun)
-     36  c800		       00 3e	   DSTATX     =	$3E	; copy of last ACIA channel D status
-     37  c800		       00 41	   V1IFLG     =	$41	; copy of last VIA #1 interrupt flags
-     38  c800		       00 42	   TPAUSE     =	$42	;Boolean: in 'pause' state of HUB memory copy?
-     39  c800
-     40  c800							;----------  'HUB' SHARED MEMORY
-     41  c800		       03 00	   HL_MEM     =	$300	; memory space for 3 local Hub members (84 bytes each)
-     42  c800		       04 00	   HX_MEM     =	$400	; memory space for 3 'external' Hub members (84 bytes each)
-     43  c800
-     44  c800							;----------  4 X 6850 ACIA (Serial interface) chips
-     45  c800		       40 10	   HUB_AS     =	$4010	;HUB ACIA A - Control/Status register
-     46  c800		       40 11	   HUB_A      =	$4011	;HUB ACIA A - Data register
-     47  c800		       40 20	   HUB_BS     =	$4020	;HUB ACIA B - Control/Status register
-     48  c800		       40 21	   HUB_B      =	$4021	;HUB ACIA B - Data register
-     49  c800		       40 40	   HUB_CS     =	$4040	;HUB ACIA C - Control/Status register
-     50  c800		       40 41	   HUB_C      =	$4041	;HUB ACIA C - Data register
-     51  c800		       40 80	   HUB_DS     =	$4080	;HUB ACIA D - Control/Status register
-     52  c800		       40 81	   HUB_D      =	$4081	;HUB ACIA D - Data register
-     53  c800
-     54  c800		       89 72	   BEEP       =	$8972	; SYM Monitor subroutines
-     55  c800		       89 a5	   CONFIG     =	$89A5
-     56  c800		       8b 86	   ACCESS     =	$8B86
-     57  c800		       8c 29	   SEGSM1     =	$8C29	; SYM display
-     58  c800
-     59  c800							;---------  VIA (6522) #1
-     60  c800		       a0 04	   V1T1CL     =	$A004	;VIA 1 Timer 1 Write Latch / Read Counter Low byte
-     61  c800		       a0 08	   V1T2CL     =	$A008	;VIA 1 Timer 2 Write Latch / Read Counter Low byte
-     62  c800		       a0 0b	   V1_ACR     =	$A00B	;VIA 1 Auxiliary Control Register
-     63  c800		       a0 0d	   V1_IFR     =	$A00D	;VIA 1 Interrupt Flag Register
-     64  c800		       a0 0e	   V1_IER     =	$A00E	;VIA 1 Interrupt Enable Register
-     65  c800
-     66  c800							;---------  6532 (which includes system RAM)
-     67  c800		       a4 00	   KBDORA     =	$A400	;6532 Output register A (Keyboard columns)
-     68  c800		       a4 02	   KBDORB     =	$A402	;6532 Output register B (Keyboard rows)
-     69  c800		       a6 40	   DSPBUF     =	$A640	;6532 System RAM: Display Buffer
-     70  c800
-     71  c800							;---------  VIA (6522) #2
-     72  c800		       a8 08	   V2T2CL     =	$A808	;VIA 2 Timer 2 Write Latch / Read Counter Low byte
-     73  c800		       a8 0b	   V2_ACR     =	$A80B	;VIA 2 Auxiliary Control Register
-     74  c800		       a8 0d	   V2_IFR     =	$A80D	;VIA 2 Interrupt Flag Register
-     75  c800		       a8 0e	   V2_IER     =	$A80E	;VIA 2 Interrupt Enable Register
-     76  c800		       ff f6	   USRBRK     =	$FFF6	;User break vector
-     77  c800		       ff fc	   RSTVEC     =	$FFFC	;Reset vector
-     78  c800		       ff fe	   IRQVEC     =	$FFFE	;Interrupt vector
-     79  c800
-     80  c800
-     81  c800		       78		      SEI
-     82  c801		       20 86 8b 	      JSR	ACCESS
-     83  c804		       ad fc ff 	      LDA	RSTVEC
-     84  c807		       85 3f		      STA	$3F
-     85  c809		       ad fd ff 	      LDA	RSTVEC+1
-     86  c80c		       85 40		      STA	$40
-     87  c80e		       a9 55		      LDA	#<RSTTRG
-     88  c810		       8d fc ff 	      STA	RSTVEC
-     89  c813		       a9 cc		      LDA	#>RSTTRG
-     90  c815		       8d fd ff 	      STA	RSTVEC+1
-     91  c818		       a9 00		      LDA	#$00
-     92  c81a		       85 00		      STA	$00
-     93  c81c		       85 01		      STA	$01
-     94  c81e		       85 02		      STA	$02
-     95  c820		       85 03		      STA	$03
-     96  c822		       85 04		      STA	$04
-     97  c824		       85 05		      STA	$05
-     98  c826		       85 2d		      STA	HCPY_F
-     99  c828		       85 2e		      STA	HX_PTR
-    100  c82a		       85 39		      STA	IN_BUF
-    101  c82c		       85 3b		      STA	OU_BUF
-    102  c82e		       85 3d		      STA	IN_BLOC
-    103  c830		       85 25		      STA	$25
-    104  c832		       85 42		      STA	TPAUSE
-    105  c834		       a9 02		      LDA	#$02
-    106  c836		       85 3a		      STA	$3A
-    107  c838		       85 3c		      STA	$3C
-    108  c83a		       a9 09		      LDA	#$09
-    109  c83c		       20 a5 89 	      JSR	CONFIG
-    110  c83f		       a2 03		      LDX	#$03
-    111  c841		       bd 2e c9    SETDSP     LDA	DSPDAT,X	;Set display to 'Hub 3.1'
-    112  c844		       9d 40 a6 	      STA	DSPBUF,X
-    113  c847		       ca		      DEX
-    114  c848		       10 f7		      BPL	SETDSP
-    115  c84a		       a2 01		      LDX	#$01
-    116  c84c		       bd 29 8c 	      LDA	SEGSM1,X
-    117  c84f		       09 80		      ORA	#$80
-    118  c851		       8d 44 a6 	      STA	DSPBUF+4
-    119  c854		       a2 03		      LDX	#$03
-    120  c856		       bd 29 8c 	      LDA	SEGSM1,X
-    121  c859		       8d 45 a6 	      STA	DSPBUF+5
-    122  c85c		       a9 aa		      LDA	#<HUBCPY
-    123  c85e		       85 2b		      STA	BVECTR
-    124  c860		       a9 cb		      LDA	#>HUBCPY
-    125  c862		       85 2c		      STA	BVECTR+1
-    126  c864		       a9 16		      LDA	#<IRQSRV
-    127  c866		       8d fe ff 	      STA	IRQVEC
-    128  c869		       a9 cb		      LDA	#>IRQSRV
-    129  c86b		       8d ff ff 	      STA	IRQVEC+1
-    130  c86e		       a9 0a		      LDA	#MPTR_A
-    131  c870		       85 06		      STA	HMEM00
-    132  c872		       a9 0f		      LDA	#MPTR_B
-    133  c874		       85 07		      STA	HMEM00+1
-    134  c876		       a9 14		      LDA	#MPTR_C
-    135  c878		       85 08		      STA	HMEM00+2
-    136  c87a		       a9 19		      LDA	#MPTR_D
-    137  c87c		       85 09		      STA	HMEM00+3
-    138  c87e		       a9 00		      LDA	#$00
-    139  c880		       85 0b		      STA	$0B
-    140  c882		       85 0d		      STA	$0D
-    141  c884		       85 10		      STA	$10
-    142  c886		       85 12		      STA	$12
-    143  c888		       85 15		      STA	$15
-    144  c88a		       85 17		      STA	$17
-    145  c88c		       85 1a		      STA	$1A
-    146  c88e		       85 1c		      STA	$1C
-    147  c890		       a9 02		      LDA	#$02
-    148  c892		       85 29		      STA	$29
-    149  c894		       a9 00		      LDA	#$00
-    150  c896		       85 2a		      STA	D_ACTV
-    151  c898		       a2 03		      LDX	#$03	;Write to all 4 ACIA status registers
-    152  c89a		       a0 00		      LDY	#ACSTAT
-    153  c89c		       a9 03	   WR1	      LDA	#$03	;Master reset
-    154  c89e		       20 d5 ca 	      JSR	WRACIA	;Write to ACIA channel (X)
-    155  c8a1		       a9 95		      LDA	#$95	; /16 = 9600 baud, 8 bits + 1 stop bit,
-    156  c8a3		       20 d5 ca 	      JSR	WRACIA	;   receive interrupt enabled
-    157  c8a6		       ca		      DEX
-    158  c8a7		       10 f3		      BPL	WR1
-    159  c8a9		       58		      CLI
-    160  c8aa							;BEGIN MAIN LOOP
-    161  c8aa		       a5 2a	   MAINLP     LDA	D_ACTV	;ACIA D already active? (external HUB)
-    162  c8ac		       d0 0d		      BNE	BRC8BB	;Yes -- skip past ACIA D polling-for-start
-    163  c8ae		       ad 80 40 	      LDA	HUB_DS	;NO: see if start byte is ready now
-    164  c8b1		       29 01		      AND	#$01	;Receive data register full on ACIA D?
-    165  c8b3		       f0 06		      BEQ	BRC8BB	;No -- skip ahead
-    166  c8b5		       ad 81 40 	      LDA	HUB_D	;Yes: grab the data from ACIA D
-    167  c8b8		       20 5c ca 	      JSR	STHTMR	; and start the HUB timer (and copy process)
-    168  c8bb		       78	   BRC8BB     SEI
-    169  c8bc		       a5 39		      LDA	IN_BUF	;Any incoming data from ACIA(s) to process?
-    170  c8be		       c5 3b		      CMP	OU_BUF
-    171  c8c0		       f0 45		      BEQ	MLOOPX	;No: skip to end of main loop
-    172  c8c2		       a0 00		      LDY	#$00	;Yes: read it in to the appropriate place in HUB memory
-    173  c8c4		       b1 3b		      LDA	(OU_BUF),Y	; Get data byte
-    174  c8c6		       85 1e		      STA	INBYTE
-    175  c8c8		       e6 3b		      INC	OU_BUF
-    176  c8ca		       b1 3b		      LDA	(OU_BUF),Y	;Get HUB channel
-    177  c8cc		       aa		      TAX		; stash it in X
-    178  c8cd		       86 28		      STX	HUBCHN	; and in var
-    179  c8cf		       e6 3b		      INC	OU_BUF
-    180  c8d1		       a5 3d		      LDA	IN_BLOC	;Read interrupts disabled (to catch up)?
-    181  c8d3		       f0 0f		      BEQ	BRC8E4	;No: skip to processing command from queue
-    182  c8d5		       c6 3d		      DEC	IN_BLOC
-    183  c8d7		       d0 0b		      BNE	BRC8E4
-    184  c8d9		       a9 95		      LDA	#$95	;Re-enable read interrupts
-    185  c8db		       8d 10 40 	      STA	HUB_AS	; (and set /16 (9600 baud)) on ACIAs A,B and C
-    186  c8de		       8d 20 40 	      STA	HUB_BS
-    187  c8e1		       8d 40 40 	      STA	HUB_CS
-    188  c8e4		       58	   BRC8E4     CLI
-    189  c8e5		       b5 06		      LDA	HMEM00,X	;Get the base address for this Hub channel's alloted memory
-    190  c8e7		       85 24		      STA	ADRPTR
-    191  c8e9		       a9 0f		      LDA	#$0F
-    192  c8eb		       25 1e		      AND	INBYTE
-    193  c8ed		       85 20		      STA	DATA	;Data nibble from incoming Command/Data byte
-    194  c8ef		       a9 f0		      LDA	#$F0
-    195  c8f1		       25 1e		      AND	INBYTE
-    196  c8f3		       85 1e		      STA	INBYTE	; Shift the 'command nibble' into place
-    197  c8f5		       4a		      LSR		; which indexes CMDTAB, below
-    198  c8f6		       4a		      LSR
-    199  c8f7		       4a		      LSR
-    200  c8f8		       aa		      TAX
-    201  c8f9		       bd 0e c9 	      LDA	CMDTAB,X
-    202  c8fc		       85 22		      STA	CMDVEC
-    203  c8fe		       e8		      INX
-    204  c8ff		       bd 0e c9 	      LDA	CMDTAB,X
-    205  c902		       85 23		      STA	CMDVEC+1
-    206  c904		       6c 22 00 	      JMP	(CMDVEC)
-    207  c907		       58	   MLOOPX     CLI
-    208  c908		       20 02 cb 	      JSR	UPDDSP
-    209  c90b		       4c aa c8    JUMP00     JMP	MAINLP	;End of main loop
-    210  c90e		       b1 c9	   CMDTAB     .WORD.w	CMD_00	;Set write address LO nibble
-    211  c910		       b9 c9		      .WORD.w	CMD_01	;Set write address MID nibble
-    212  c912		       c1 c9		      .WORD.w	CMD_02	;Set write address HI nibble
-    213  c914		       c9 c9		      .WORD.w	CMD_03	;Write lo nibble of byte to write address
-    214  c916		       d1 c9		      .WORD.w	CMD_04	;Write hi nibble of byte to write address
-    215  c918		       dc c9		      .WORD.w	CMD_05
-    216  c91a		       f3 c9		      .WORD.w	CMD_06	;Write hi nibble of byte and increment write address
-    217  c91c		       03 ca		      .WORD.w	CMD_07	;NOP
-    218  c91e		       07 ca		      .WORD.w	CMD_08	;Set read address LO nibble
-    219  c920		       0f ca		      .WORD.w	CMD_09	;Set read address MID nibble
-    220  c922		       17 ca		      .WORD.w	CMD_0A	;Set read address HI nibble
-    221  c924		       1f ca		      .WORD.w	CMD_0B	;Read byte
-    222  c926		       2a ca		      .WORD.w	CMD_0C	;Read and increment read address
-    223  c928		       3a ca		      .WORD.w	CMD_0D	;Read HUB timer lo byte
-    224  c92a		       42 ca		      .WORD.w	CMD_0E	;Read HUB timer hi byte
-    225  c92c		       4a ca		      .WORD.w	CMD_0F	;Start HUB timer
-    226  c92e
-    227  c92e		       74	   DSPDAT     .BYTE.b	$74	;Codes for "hub 3.1" message on display
-    228  c92f		       1c		      .BYTE.b	$1C
-    229  c930		       7c		      .BYTE.b	$7C
-    230  c931		       00		      .BYTE.b	$00
-    231  c932		       86		      .BYTE.b	$86
-    232  c933		       bb		      .BYTE.b	$BB
-    233  c934
-    234  c934		       98	   L_HNIB     TYA		;Set HI or LO nibble of read or write address
-    235  c935		       29 01		      AND	#$01
-    236  c937		       d0 09		      BNE	SETHIX
-    237  c939		       b1 24		      LDA	(ADRPTR),Y	;Set LO nibble
-    238  c93b		       29 f0		      AND	#$F0
-    239  c93d		       05 20		      ORA	DATA
-    240  c93f		       91 24		      STA	(ADRPTR),Y
-    241  c941		       60		      RTS
-    242  c942
-    243  c942		       18	   SETHIX     CLC		;Set HI nibble
-    244  c943		       b1 24		      LDA	(ADRPTR),Y
-    245  c945		       29 f0		      AND	#$F0
-    246  c947		       05 20		      ORA	DATA
-    247  c949		       69 03		      ADC	#>HL_MEM	;Hub memory is at $300
-    248  c94b		       91 24		      STA	(ADRPTR),Y
-    249  c94d		       60		      RTS
-    250  c94e
-    251  c94e		       b1 24	   MIDNIB     LDA	(ADRPTR),Y	;Set MID nibble of read or write address
-    252  c950		       29 0f		      AND	#$0F
-    253  c952		       06 20		      ASL	DATA
-    254  c954		       06 20		      ASL	DATA
-    255  c956		       06 20		      ASL	DATA
-    256  c958		       06 20		      ASL	DATA
-    257  c95a		       05 20		      ORA	DATA
-    258  c95c		       91 24		      STA	(ADRPTR),Y
-    259  c95e		       60		      RTS
-    260  c95f
-    261  c95f		       b1 24	   PREPRW     LDA	(ADRPTR),Y	;Set up memory pointer
-    262  c961		       85 26		      STA	MEMORY
-    263  c963		       c8		      INY
-    264  c964		       b1 24		      LDA	(ADRPTR),Y
-    265  c966		       85 27		      STA	MEMORY+1
-    266  c968		       60		      RTS
-    267  c969
-    268  c969		       a0 00	   WRITEX     LDY	#WRI_PT	;Write current data byte to current MEMORY address
-    269  c96b		       20 5f c9 	      JSR	PREPRW
-    270  c96e		       a0 04		      LDY	#DAT_PT
-    271  c970		       b1 24		      LDA	(ADRPTR),Y
-    272  c972		       a0 00		      LDY	#WRI_PT
-    273  c974		       91 26		      STA	(MEMORY),Y
-    274  c976		       60		      RTS
-    275  c977
-    276  c977		       18	   INCADR     CLC
-    277  c978		       b1 24		      LDA	(ADRPTR),Y
-    278  c97a		       69 01		      ADC	#$01
-    279  c97c		       91 24		      STA	(ADRPTR),Y
-    280  c97e		       90 08		      BCC	BRC988
-    281  c980		       18		      CLC
-    282  c981		       c8		      INY
-    283  c982		       b1 24		      LDA	(ADRPTR),Y
-    284  c984		       69 01		      ADC	#$01
-    285  c986		       91 24		      STA	(ADRPTR),Y
-    286  c988		       60	   BRC988     RTS
-    287  c989
-    288  c989		       a6 28	   READXX     LDX	HUBCHN	;Read data byte from current MEMORY address
-    289  c98b		       a0 00		      LDY	#ACSTAT	; and write it to requesting HUB channel
-    290  c98d		       20 aa ca    BRC98D     JSR	RDACIA	;Wait for that ACIA to be ready to transmit
-    291  c990		       29 02		      AND	#$02
-    292  c992		       f0 f9		      BEQ	BRC98D
-    293  c994		       a0 00		      LDY	#$00
-    294  c996		       b1 26		      LDA	(MEMORY),Y
-    295  c998		       a0 01		      LDY	#ACDATA
-    296  c99a		       20 d5 ca 	      JSR	WRACIA	;Write data byte to ACIA (X) data register
-    297  c99d		       60		      RTS
-    298  c99e
-    299  c99e		       a6 28	   BYTOUT     LDX	HUBCHN
-    300  c9a0		       a0 00		      LDY	#ACSTAT
-    301  c9a2		       48		      PHA
-    302  c9a3		       20 aa ca    BRC9A3     JSR	RDACIA	;Read ACIA status register
-    303  c9a6		       29 02		      AND	#$02
-    304  c9a8		       f0 f9		      BEQ	BRC9A3
-    305  c9aa		       68		      PLA
-    306  c9ab		       a0 01		      LDY	#ACDATA
-    307  c9ad		       20 d5 ca 	      JSR	WRACIA	;Write to ACIA data register
-    308  c9b0		       60		      RTS
-    309  c9b1
-    310  c9b1							; Commands received from ACIAs
-    311  c9b1		       a0 00	   CMD_00     LDY	#WRI_PT	;Set write address LO nibble
-    312  c9b3		       20 34 c9 	      JSR	L_HNIB
-    313  c9b6		       4c 0b c9 	      JMP	JUMP00
-    314  c9b9
-    315  c9b9		       a0 00	   CMD_01     LDY	#WRI_PT	;Set write address MID nibble
-    316  c9bb		       20 4e c9 	      JSR	MIDNIB
-    317  c9be		       4c 0b c9 	      JMP	JUMP00
-    318  c9c1
-    319  c9c1		       a0 01	   CMD_02     LDY	#WRI_PT+1	;Set write address HI nibble
-    320  c9c3		       20 34 c9 	      JSR	L_HNIB
-    321  c9c6		       4c 0b c9 	      JMP	JUMP00
-    322  c9c9
-    323  c9c9		       a0 04	   CMD_03     LDY	#DAT_PT	;Write lo nibble of byte
-    324  c9cb		       20 34 c9 	      JSR	L_HNIB
-    325  c9ce		       4c 0b c9 	      JMP	JUMP00
-    326  c9d1
-    327  c9d1		       a0 04	   CMD_04     LDY	#DAT_PT	;Write hi nibble of byte to write address
-    328  c9d3		       20 4e c9 	      JSR	MIDNIB
-    329  c9d6		       20 69 c9 	      JSR	WRITEX
-    330  c9d9		       4c 0b c9 	      JMP	JUMP00
-    331  c9dc
-    332  c9dc		       18	   CMD_05     CLC		;Add data value to the write address
-    333  c9dd		       a0 00		      LDY	#WRI_PT
-    334  c9df		       b1 24		      LDA	(ADRPTR),Y
-    335  c9e1		       65 20		      ADC	DATA
-    336  c9e3		       91 24		      STA	(ADRPTR),Y
-    337  c9e5		       90 09		      BCC	BRC9F0
-    338  c9e7		       18		      CLC
-    339  c9e8		       a0 01		      LDY	#WRI_PT+1
-    340  c9ea		       b1 24		      LDA	(ADRPTR),Y
-    341  c9ec		       69 01		      ADC	#$01
-    342  c9ee		       91 24		      STA	(ADRPTR),Y
-    343  c9f0		       4c 0b c9    BRC9F0     JMP	JUMP00
-    344  c9f3
-    345  c9f3		       a0 04	   CMD_06     LDY	#DAT_PT	;Write hi nibble of byte and incrememnt write address
-    346  c9f5		       20 4e c9 	      JSR	MIDNIB
-    347  c9f8		       20 69 c9 	      JSR	WRITEX
-    348  c9fb		       a0 00		      LDY	#WRI_PT
-    349  c9fd		       20 77 c9 	      JSR	INCADR
-    350  ca00		       4c 0b c9 	      JMP	JUMP00
-    351  ca03
-    352  ca03		       ea	   CMD_07     NOP		;Placeholder
-    353  ca04		       4c 0b c9 	      JMP	JUMP00
-    354  ca07
-    355  ca07		       a0 02	   CMD_08     LDY	#REA_PT	;Set read address LO nibble
-    356  ca09		       20 34 c9 	      JSR	L_HNIB
-    357  ca0c		       4c 0b c9 	      JMP	JUMP00
-    358  ca0f
-    359  ca0f		       a0 02	   CMD_09     LDY	#REA_PT	;Set read address MID nibble
-    360  ca11		       20 4e c9 	      JSR	MIDNIB
-    361  ca14		       4c 0b c9 	      JMP	JUMP00
-    362  ca17
-    363  ca17		       a0 03	   CMD_0A     LDY	#REA_PT+1	;Set read address HI nibble
-    364  ca19		       20 34 c9 	      JSR	L_HNIB
-    365  ca1c		       4c 0b c9 	      JMP	JUMP00
-    366  ca1f
-    367  ca1f		       a0 02	   CMD_0B     LDY	#REA_PT	;Read byte from MEMORY and write to requesting Hub channel
-    368  ca21		       20 5f c9 	      JSR	PREPRW
-    369  ca24		       20 89 c9 	      JSR	READXX
-    370  ca27		       4c 0b c9 	      JMP	JUMP00
-    371  ca2a
-    372  ca2a		       a0 02	   CMD_0C     LDY	#REA_PT	;Read byte and increment read address
-    373  ca2c		       20 5f c9 	      JSR	PREPRW
-    374  ca2f		       20 89 c9 	      JSR	READXX
-    375  ca32		       a0 02		      LDY	#REA_PT
-    376  ca34		       20 77 c9 	      JSR	INCADR
-    377  ca37		       4c 0b c9 	      JMP	JUMP00
-    378  ca3a
-    379  ca3a		       a5 00	   CMD_0D     LDA	HTIMER	;Read HUB timer lo
-    380  ca3c		       20 9e c9 	      JSR	BYTOUT
-    381  ca3f		       4c 0b c9 	      JMP	JUMP00
-    382  ca42		       a5 01	   CMD_0E     LDA	HTIMER+1	;Read HUB timer hi
-    383  ca44		       20 9e c9 	      JSR	BYTOUT
-    384  ca47		       4c 0b c9 	      JMP	JUMP00
-    385  ca4a
-    386  ca4a		       a5 20	   CMD_0F     LDA	DATA	;Start HUB timer
-    387  ca4c		       c9 01		      CMP	#$01
-    388  ca4e		       d0 06		      BNE	BRCA56
-    389  ca50		       20 8f ca 	      JSR	CLRDSP
-    390  ca53		       4c 0b c9 	      JMP	JUMP00
-    391  ca56		       20 5c ca    BRCA56     JSR	STHTMR
-    392  ca59		       4c 0b c9 	      JMP	JUMP00
-    393  ca5c
-    394  ca5c							;Start HUB timer and enable interrupts from channel D (external copy)
-    395  ca5c		       78	   STHTMR     SEI
-    396  ca5d		       a9 c0		      LDA	#$C0
-    397  ca5f		       8d 0b a0 	      STA	V1_ACR	;V1 Timer 1 is free-running
-    398  ca62		       a9 00		      LDA	#$00
-    399  ca64		       8d 0b a8 	      STA	V2_ACR	;V2 Timer 1 is one-shot
-    400  ca67		       a9 7f		      LDA	#$7F
-    401  ca69		       8d 0e a0 	      STA	V1_IER
-    402  ca6c		       8d 0e a8 	      STA	V2_IER
-    403  ca6f		       a9 e0		      LDA	#$E0
-    404  ca71		       8d 0e a0 	      STA	V1_IER
-    405  ca74		       a9 a0		      LDA	#$A0
-    406  ca76		       8d 0e a8 	      STA	V2_IER
-    407  ca79		       a9 1a		      LDA	#$1A	;Set V1 Timer 1 to $411A (16.667 mSecs, or 60 Hz)
-    408  ca7b		       8d 04 a0 	      STA	V1T1CL
-    409  ca7e		       a9 41		      LDA	#$41
-    410  ca80		       8d 05 a0 	      STA	V1T1CL+1
-    411  ca83		       a9 b6		      LDA	#$B6	;Config. ACIA D: /64 (2400 baud) - 8 bits + 1 stop bit,
-    412  ca85		       8d 80 40 	      STA	HUB_DS	;  enable receive AND transmit interrupts
-    413  ca88		       a9 ff		      LDA	#$FF
-    414  ca8a		       85 2a		      STA	D_ACTV
-    415  ca8c		       8d 81 40 	      STA	HUB_D	; Send "initiator" byte to other HUB to start copy process
-    416  ca8f		       78	   CLRDSP     SEI		;Reset HUB timer and clear display
-    417  ca90		       a9 00		      LDA	#$00
-    418  ca92		       85 00		      STA	HTIMER
-    419  ca94		       85 01		      STA	HTIMER+1
-    420  ca96		       85 38		      STA	$38
-    421  ca98		       85 37		      STA	$37
-    422  ca9a		       85 36		      STA	$36
-    423  ca9c		       85 35		      STA	$35
-    424  ca9e		       85 34		      STA	$34
-    425  caa0		       a2 05		      LDX	#$05
-    426  caa2		       9d 40 a6    BRCAA2     STA	DSPBUF,X
-    427  caa5		       ca		      DEX
-    428  caa6		       10 fa		      BPL	BRCAA2
-    429  caa8		       58		      CLI
-    430  caa9		       60		      RTS
-    431  caaa
-    432  caaa							; Read byte from HUB channel (X) ACIA, register (Y)
-    433  caaa		       8a	   RDACIA     TXA
-    434  caab		       48		      PHA
-    435  caac		       0a		      ASL
-    436  caad		       aa		      TAX
-    437  caae		       bd bd ca 	      LDA	HBRADR,X
-    438  cab1		       85 2f		      STA	READVC
-    439  cab3		       bd be ca 	      LDA	HBRADR+1,X
-    440  cab6		       85 30		      STA	READVC+1
-    441  cab8		       68		      PLA
-    442  cab9		       aa		      TAX
-    443  caba		       6c 2f 00 	      JMP	(READVC)
-    444  cabd		       c5 ca	   HBRADR     .WORD.w	HUBR0
-    445  cabf		       c9 ca		      .WORD.w	HUBR1
-    446  cac1		       cd ca		      .WORD.w	HUBR2
-    447  cac3		       d1 ca		      .WORD.w	HUBR3
-    448  cac5		       b9 10 40    HUBR0      LDA	HUB_AS,Y
-    449  cac8		       60		      RTS
-    450  cac9		       b9 20 40    HUBR1      LDA	HUB_BS,Y
-    451  cacc		       60		      RTS
-    452  cacd		       b9 40 40    HUBR2      LDA	HUB_CS,Y
-    453  cad0		       60		      RTS
-    454  cad1		       b9 80 40    HUBR3      LDA	HUB_DS,Y
-    455  cad4		       60		      RTS
-    456  cad5
-    457  cad5							; Write byte to HUB channel (X) ACIA, register (Y)
-    458  cad5		       48	   WRACIA     PHA
-    459  cad6		       8a		      TXA
-    460  cad7		       48		      PHA
-    461  cad8		       0a		      ASL
-    462  cad9		       aa		      TAX
-    463  cada		       bd ea ca 	      LDA	HBWADR,X
-    464  cadd		       85 31		      STA	WRITVC
-    465  cadf		       bd eb ca 	      LDA	HBWADR+1,X
-    466  cae2		       85 32		      STA	WRITVC+1
-    467  cae4		       68		      PLA
-    468  cae5		       aa		      TAX
-    469  cae6		       68		      PLA
-    470  cae7		       6c 31 00 	      JMP	(WRITVC)
-    471  caea		       f2 ca	   HBWADR     .WORD.w	HUBW0
-    472  caec		       f6 ca		      .WORD.w	HUBW1
-    473  caee		       fa ca		      .WORD.w	HUBW2
-    474  caf0		       fe ca		      .WORD.w	HUBW3
-    475  caf2		       99 10 40    HUBW0      STA	HUB_AS,Y
-    476  caf5		       60		      RTS
-    477  caf6		       99 20 40    HUBW1      STA	HUB_BS,Y
-    478  caf9		       60		      RTS
-    479  cafa		       99 40 40    HUBW2      STA	HUB_CS,Y
-    480  cafd		       60		      RTS
-    481  cafe		       99 80 40    HUBW3      STA	HUB_DS,Y
-    482  cb01		       60		      RTS
-    483  cb02		       a2 05	   UPDDSP     LDX	#$05
-    484  cb04		       a0 00		      LDY	#$00
-    485  cb06		       bd 40 a6    SCNLUP     LDA	DSPBUF,X
-    486  cb09		       8c 00 a4 	      STY	KBDORA
-    487  cb0c		       8e 02 a4 	      STX	KBDORB
-    488  cb0f		       8d 00 a4 	      STA	KBDORA
-    489  cb12		       ca		      DEX
-    490  cb13		       10 f1		      BPL	SCNLUP
-    491  cb15		       60		      RTS
-    492  cb16
-    493  cb16							; Interrupt service routine
-    494  cb16		       48	   IRQSRV     PHA
-    495  cb17		       8a		      TXA
-    496  cb18		       48		      PHA
-    497  cb19		       98		      TYA
-    498  cb1a		       48		      PHA
-    499  cb1b		       ba		      TSX
-    500  cb1c		       bd 04 01 	      LDA	$0104,X
-    501  cb1f		       29 10		      AND	#$10
-    502  cb21		       f0 08		      BEQ	NOBRK
-    503  cb23		       68		      PLA
-    504  cb24		       a8		      TAY
-    505  cb25		       68		      PLA
-    506  cb26		       aa		      TAX
-    507  cb27		       68		      PLA
-    508  cb28		       6c f6 ff 	      JMP	(USRBRK)
-    509  cb2b
-    510  cb2b		       a0 00	   NOBRK      LDY	#$00
-    511  cb2d		       a6 29		      LDX	$29
-    512  cb2f		       e0 03		      CPX	#$03
-    513  cb31		       90 0c		      BCC	BRCB3F
-    514  cb33		       ad 80 40 	      LDA	HUB_DS	; Any data ready from ACIA D?
-    515  cb36		       10 06		      BPL	BRCB3E
-    516  cb38		       ad 81 40 	      LDA	HUB_D	; Yes: grab it
-    517  cb3b		       20 82 cb 	      JSR	STOREB
-    518  cb3e		       ca	   BRCB3E     DEX
-    519  cb3f		       ad 40 40    BRCB3F     LDA	HUB_CS	; Any data ready from ACIA C?
-    520  cb42		       10 06		      BPL	BRCB4A
-    521  cb44		       ad 41 40 	      LDA	HUB_C	; Yes: grab it
-    522  cb47		       20 82 cb 	      JSR	STOREB
-    523  cb4a		       ca	   BRCB4A     DEX
-    524  cb4b		       ad 20 40 	      LDA	HUB_BS	; Any data ready from ACIA B?
-    525  cb4e		       10 06		      BPL	BRCB56
-    526  cb50		       ad 21 40 	      LDA	HUB_B	; Yes: grab it
-    527  cb53		       20 82 cb 	      JSR	STOREB
-    528  cb56		       ca	   BRCB56     DEX
-    529  cb57		       ad 10 40 	      LDA	HUB_AS	; Any data ready from ACIA A?
-    530  cb5a		       10 06		      BPL	BRCB62
-    531  cb5c		       ad 11 40 	      LDA	HUB_A	; Yes: grab it
-    532  cb5f		       20 82 cb 	      JSR	STOREB
-    533  cb62		       ad 0d a0    BRCB62     LDA	V1_IFR	; Is this a V1 timer interrupt?
-    534  cb65		       85 41		      STA	V1IFLG
-    535  cb67		       8d 0d a0 	      STA	V1_IFR	; Clear all bits in V1 IFR
-    536  cb6a		       10 3b		      BPL	GOJUMP
-    537  cb6c		       29 40		      AND	#$40	; Timeout of timer 1?
-    538  cb6e		       f0 37		      BEQ	GOJUMP
-    539  cb70		       e6 00		      INC	HTIMER	; Yes: increment Hub timer count
-    540  cb72		       d0 02		      BNE	BRCB76
-    541  cb74		       e6 01		      INC	HTIMER+1
-    542  cb76		       20 14 cc    BRCB76     JSR	SCAN_D
-    543  cb79		       4c a7 cb 	      JMP	GOJUMP
-    544  cb7c
-    545  cb7c		       68	   IRQOUT     PLA
-    546  cb7d		       a8		      TAY
-    547  cb7e		       68		      PLA
-    548  cb7f		       aa		      TAX
-    549  cb80		       68		      PLA
-    550  cb81		       40		      RTI
-    551  cb82
-    552  cb82
-    553  cb82		       91 39	   STOREB     STA	(IN_BUF),Y	; Stash byte
-    554  cb84		       e6 39		      INC	IN_BUF
-    555  cb86		       8a		      TXA
-    556  cb87		       91 39		      STA	(IN_BUF),Y	; and the channel it came from
-    557  cb89		       e6 39		      INC	IN_BUF
-    558  cb8b		       a5 39		      LDA	IN_BUF
-    559  cb8d		       18		      CLC
-    560  cb8e		       69 10		      ADC	#$10	;Check to see if we're not keeping up with incoming
-    561  cb90		       c5 3b		      CMP	OU_BUF
-    562  cb92		       d0 12		      BNE	BRCBA6	; Everything's ok -- keep going
-    563  cb94		       a9 55		      LDA	#$55	;We're falling behind against incoming data:
-    564  cb96		       8d 10 40 	      STA	HUB_AS	; temporarily disable ACIA A,B and C read interrupts
-    565  cb99		       8d 20 40 	      STA	HUB_BS
-    566  cb9c		       8d 40 40 	      STA	HUB_CS
-    567  cb9f		       a9 02		      LDA	#$02	;Keep 'em disabled for 2 main loops
-    568  cba1		       85 3d		      STA	IN_BLOC
-    569  cba3		       20 72 89 	      JSR	BEEP	;Make a beep to signal overrun
-    570  cba6		       60	   BRCBA6     RTS
-    571  cba7
-    572  cba7		       6c 2b 00    GOJUMP     JMP	(BVECTR)	;This jumps to 'HUBCPY' just below
-    573  cbaa
-    574  cbaa							;Read in copy of external HUB data page - and write out copy of local page to external HUB
-    575  cbaa		       a5 41	   HUBCPY     LDA	V1IFLG	;Check flags from last VIA #1 interrupt
-    576  cbac		       10 0d		      BPL	BRCBBB	; no interrupt -- skip ahead
-    577  cbae		       29 20		      AND	#$20	; V1 timer 2 interrupt?
-    578  cbb0		       f0 09		      BEQ	BRCBBB	; no -- skip ahead
-    579  cbb2		       a9 00		      LDA	#$00	; yes: end PAUSE of memory copy
-    580  cbb4		       85 42		      STA	TPAUSE
-    581  cbb6		       a9 b6		      LDA	#$B6	;Config. ACIA D: x/64 (2400 baud) - 8 bits + 1 stop bit,
-    582  cbb8		       8d 80 40 	      STA	HUB_DS	;  enable receive AND transmit interrupts
-    583  cbbb		       ad 0d a8    BRCBBB     LDA	V2_IFR	;Interrupt on V2? (HubCopy Timeout)
-    584  cbbe		       10 07		      BPL	BRCBC7
-    585  cbc0		       8d 0d a8 	      STA	V2_IFR
-    586  cbc3		       a9 00		      LDA	#$00	;Yes: reset HUB-copy write pointer to beginning of page
-    587  cbc5		       85 2e		      STA	HX_PTR
-    588  cbc7		       ad 80 40    BRCBC7     LDA	HUB_DS	;Check if there's an incoming byte from remote HUB data
-    589  cbca		       85 3e		      STA	DSTATX	;  (a.k.a channel D)
-    590  cbcc		       10 18		      BPL	HCPYOU	;None ready
-    591  cbce		       29 01		      AND	#$01
-    592  cbd0		       f0 14		      BEQ	HCPYOU
-    593  cbd2		       ad 81 40 	      LDA	HUB_D	;One *is* ready - read it in
-    594  cbd5		       a4 2e		      LDY	HX_PTR
-    595  cbd7		       99 00 04 	      STA	HX_MEM,Y	;Stash it...
-    596  cbda		       e6 2e		      INC	HX_PTR	; and increment the pointer
-    597  cbdc		       a9 d2		      LDA	#$D2	;reset V2 Timer 2 (HubCopy Timeout) to $30D2 (12.498 mSec)
-    598  cbde		       8d 08 a8 	      STA	V2T2CL
-    599  cbe1		       a9 30		      LDA	#$30
-    600  cbe3		       8d 09 a8 	      STA	V2T2CL+1
-    601  cbe6		       a5 3e	   HCPYOU     LDA	DSTATX	;Get last ACIA D status
-    602  cbe8		       10 92		      BPL	IRQOUT	; If no interrrupt request, skip out
-    603  cbea		       29 02		      AND	#$02	; If not 'Transmit Data Register Empty'
-    604  cbec		       f0 8e		      BEQ	IRQOUT	;     -- skip out
-    605  cbee		       24 42		      BIT	TPAUSE	; If in 'pause' state of mem. copy
-    606  cbf0		       30 8a		      BMI	IRQOUT	;     -- skip out
-    607  cbf2		       a4 2d		      LDY	HCPY_F	; Get current copy-from pointer
-    608  cbf4		       e6 2d		      INC	HCPY_F	; Increment copy-from pointer
-    609  cbf6		       d0 13		      BNE	BRCC0B	; If no page wrap, skip to writing byte out
-    610  cbf8		       a9 5e		      LDA	#$5E	;At page wrap: go into 21 mSec pause, for synchronization
-    611  cbfa		       8d 08 a0 	      STA	V1T2CL	;Set VIA #1 Timer 2 to $515E (20.830 mSec)
-    612  cbfd		       a9 51		      LDA	#$51
-    613  cbff		       8d 09 a0 	      STA	V1T2CL+1
-    614  cc02		       a9 ff		      LDA	#$FF
-    615  cc04		       85 42		      STA	TPAUSE
-    616  cc06		       a9 96		      LDA	#$96	;Enable RECEIVE but NOT TRANSMIT interrupts on ACIA D
-    617  cc08		       8d 80 40 	      STA	HUB_DS
-    618  cc0b		       b9 00 03    BRCC0B     LDA	HL_MEM,Y
-    619  cc0e		       8d 81 40 	      STA	HUB_D	;Write current 'copy' byte to ACIA D (remote HUB)
-    620  cc11		       4c 7c cb 	      JMP	IRQOUT
-    621  cc14
-    622  cc14
-    623  cc14		       e6 38	   SCAN_D     INC	$38	;Scan the display (? Not totally sure what else it does)
-    624  cc16		       a5 38		      LDA	$38
-    625  cc18		       c9 3c		      CMP	#$3C
-    626  cc1a		       90 2a		      BCC	BRCC46
-    627  cc1c		       a9 00		      LDA	#$00
-    628  cc1e		       85 38		      STA	$38
-    629  cc20		       e6 37		      INC	$37
-    630  cc22		       a5 37		      LDA	$37
-    631  cc24		       c9 0a		      CMP	#$0A
-    632  cc26		       90 1e		      BCC	BRCC46
-    633  cc28		       a9 00		      LDA	#$00
-    634  cc2a		       85 37		      STA	$37
-    635  cc2c		       e6 36		      INC	$36
-    636  cc2e		       a5 36		      LDA	$36
-    637  cc30		       c9 06		      CMP	#$06
-    638  cc32		       90 12		      BCC	BRCC46
-    639  cc34		       a9 00		      LDA	#$00
-    640  cc36		       85 36		      STA	$36
-    641  cc38		       e6 35		      INC	$35
-    642  cc3a		       a5 35		      LDA	$35
-    643  cc3c		       c9 0a		      CMP	#$0A
-    644  cc3e		       90 06		      BCC	BRCC46
-    645  cc40		       a9 00		      LDA	#$00
-    646  cc42		       85 35		      STA	$35
-    647  cc44		       e6 34		      INC	$34
-    648  cc46		       a2 03	   BRCC46     LDX	#$03
-    649  cc48		       b5 34	   BRCC48     LDA	$34,X
-    650  cc4a		       a8		      TAY
-    651  cc4b		       b9 29 8c 	      LDA	SEGSM1,Y
-    652  cc4e		       9d 42 a6 	      STA	DSPBUF+2,X
-    653  cc51		       ca		      DEX
-    654  cc52		       10 f4		      BPL	BRCC48
-    655  cc54		       60		      RTS
-    656  cc55
-    657  cc55							;Reset ALL ACIAs
-    658  cc55		       a9 03	   RSTTRG     LDA	#$03
-    659  cc57		       8d 10 40 	      STA	HUB_AS
-    660  cc5a		       8d 20 40 	      STA	HUB_BS
-    661  cc5d		       8d 40 40 	      STA	HUB_CS
-    662  cc60		       8d 80 40 	      STA	HUB_DS
-    663  cc63		       6c 3f 00 	      JMP	($003F)
-    664  cc63					      .END
+     27  c800		       00 29	   PRTSNO     =	$29	;Set to $03 to use PORT D as extra Hubster (no copy channel)
+     28  c800		       00 2a	   D_ACTV     =	$2A
+     29  c800		       00 2b	   BVECTR     =	$2B	;two-byte jump vector
+     30  c800		       00 2d	   HCPY_F     =	$2D	;HUB copy (from) pointer
+     31  c800		       00 2e	   HX_PTR     =	$2E	;Pointer to 'external' page of Hub memory, for copying operation
+     32  c800		       00 2f	   READVC     =	$002F	;ACIA Read vector (2 bytes)
+     33  c800		       00 31	   WRITVC     =	$0031	;ACIA Write vector (2 bytes)
+     34  c800		       00 39	   IN_BUF     =	$39	;Incoming bytes (and associated channel) from ACIA interrupts stored here
+     35  c800		       00 3b	   OU_BUF     =	$3B	;  Keeps track of processed bytes
+     36  c800		       00 3d	   IN_BLOC    =	$3D	;Block incoming data? (overrun)
+     37  c800		       00 3e	   DSTATX     =	$3E	; copy of last ACIA channel D status
+     38  c800		       00 41	   V1IFLG     =	$41	; copy of last VIA #1 interrupt flags
+     39  c800		       00 42	   TPAUSE     =	$42	;Boolean: in 'pause' state of HUB memory copy?
+     40  c800
+     41  c800							;----------  'HUB' SHARED MEMORY
+     42  c800		       03 00	   HL_MEM     =	$300	; memory space for 3 local Hub members (84 bytes each)
+     43  c800		       04 00	   HX_MEM     =	$400	; memory space for 3 'external' Hub members (84 bytes each)
+     44  c800
+     45  c800							;----------  4 X 6850 ACIA (Serial interface) chips
+     46  c800		       40 10	   HUB_AS     =	$4010	;HUB ACIA A - Control/Status register
+     47  c800		       40 11	   HUB_A      =	$4011	;HUB ACIA A - Data register
+     48  c800		       40 20	   HUB_BS     =	$4020	;HUB ACIA B - Control/Status register
+     49  c800		       40 21	   HUB_B      =	$4021	;HUB ACIA B - Data register
+     50  c800		       40 40	   HUB_CS     =	$4040	;HUB ACIA C - Control/Status register
+     51  c800		       40 41	   HUB_C      =	$4041	;HUB ACIA C - Data register
+     52  c800		       40 80	   HUB_DS     =	$4080	;HUB ACIA D - Control/Status register
+     53  c800		       40 81	   HUB_D      =	$4081	;HUB ACIA D - Data register
+     54  c800
+     55  c800		       89 72	   BEEP       =	$8972	; SYM Monitor subroutines
+     56  c800		       89 a5	   CONFIG     =	$89A5
+     57  c800		       8b 86	   ACCESS     =	$8B86
+     58  c800		       8c 29	   SEGSM1     =	$8C29	; SYM display
+     59  c800
+     60  c800							;---------  VIA (6522) #1
+     61  c800		       a0 04	   V1T1CL     =	$A004	;VIA 1 Timer 1 Write Latch / Read Counter Low byte
+     62  c800		       a0 08	   V1T2CL     =	$A008	;VIA 1 Timer 2 Write Latch / Read Counter Low byte
+     63  c800		       a0 0b	   V1_ACR     =	$A00B	;VIA 1 Auxiliary Control Register
+     64  c800		       a0 0d	   V1_IFR     =	$A00D	;VIA 1 Interrupt Flag Register
+     65  c800		       a0 0e	   V1_IER     =	$A00E	;VIA 1 Interrupt Enable Register
+     66  c800
+     67  c800							;---------  6532 (which includes system RAM)
+     68  c800		       a4 00	   KBDORA     =	$A400	;6532 Output register A (Keyboard columns)
+     69  c800		       a4 02	   KBDORB     =	$A402	;6532 Output register B (Keyboard rows)
+     70  c800		       a6 40	   DSPBUF     =	$A640	;6532 System RAM: Display Buffer
+     71  c800
+     72  c800							;---------  VIA (6522) #2
+     73  c800		       a8 08	   V2T2CL     =	$A808	;VIA 2 Timer 2 Write Latch / Read Counter Low byte
+     74  c800		       a8 0b	   V2_ACR     =	$A80B	;VIA 2 Auxiliary Control Register
+     75  c800		       a8 0d	   V2_IFR     =	$A80D	;VIA 2 Interrupt Flag Register
+     76  c800		       a8 0e	   V2_IER     =	$A80E	;VIA 2 Interrupt Enable Register
+     77  c800
+     78  c800		       ff f6	   USRBRK     =	$FFF6	;User break vector
+     79  c800		       ff fc	   RSTVEC     =	$FFFC	;Reset vector
+     80  c800		       ff fe	   IRQVEC     =	$FFFE	;Interrupt vector
+     81  c800
+     82  c800
+     83  c800		       78		      SEI
+     84  c801		       20 86 8b 	      JSR	ACCESS	;Unlock system RAM (display, keyboard)
+     85  c804		       ad fc ff 	      LDA	RSTVEC	;Splice into reset vector
+     86  c807		       85 3f		      STA	$3F
+     87  c809		       ad fd ff 	      LDA	RSTVEC+1
+     88  c80c		       85 40		      STA	$40
+     89  c80e		       a9 55		      LDA	#<RSTTRG
+     90  c810		       8d fc ff 	      STA	RSTVEC
+     91  c813		       a9 cc		      LDA	#>RSTTRG
+     92  c815		       8d fd ff 	      STA	RSTVEC+1	;Init page zero vars
+     93  c818		       a9 00		      LDA	#$00
+     94  c81a		       85 00		      STA	$00
+     95  c81c		       85 01		      STA	$01
+     96  c81e		       85 02		      STA	$02
+     97  c820		       85 03		      STA	$03
+     98  c822		       85 04		      STA	$04
+     99  c824		       85 05		      STA	$05
+    100  c826		       85 2d		      STA	HCPY_F
+    101  c828		       85 2e		      STA	HX_PTR
+    102  c82a		       85 39		      STA	IN_BUF
+    103  c82c		       85 3b		      STA	OU_BUF
+    104  c82e		       85 3d		      STA	IN_BLOC
+    105  c830		       85 25		      STA	$25
+    106  c832		       85 42		      STA	TPAUSE
+    107  c834		       a9 02		      LDA	#$02
+    108  c836		       85 3a		      STA	$3A
+    109  c838		       85 3c		      STA	$3C
+    110  c83a		       a9 09		      LDA	#$09
+    111  c83c		       20 a5 89 	      JSR	CONFIG
+    112  c83f		       a2 03		      LDX	#$03
+    113  c841		       bd 2e c9    SETDSP     LDA	DSPDAT,X	;Set display to 'Hub 3.1'
+    114  c844		       9d 40 a6 	      STA	DSPBUF,X
+    115  c847		       ca		      DEX
+    116  c848		       10 f7		      BPL	SETDSP
+    117  c84a		       a2 01		      LDX	#$01
+    118  c84c		       bd 29 8c 	      LDA	SEGSM1,X
+    119  c84f		       09 80		      ORA	#$80
+    120  c851		       8d 44 a6 	      STA	DSPBUF+4
+    121  c854		       a2 03		      LDX	#$03
+    122  c856		       bd 29 8c 	      LDA	SEGSM1,X
+    123  c859		       8d 45 a6 	      STA	DSPBUF+5
+    124  c85c		       a9 aa		      LDA	#<HUBCPY
+    125  c85e		       85 2b		      STA	BVECTR
+    126  c860		       a9 cb		      LDA	#>HUBCPY
+    127  c862		       85 2c		      STA	BVECTR+1
+    128  c864		       a9 16		      LDA	#<IRQSRV
+    129  c866		       8d fe ff 	      STA	IRQVEC
+    130  c869		       a9 cb		      LDA	#>IRQSRV
+    131  c86b		       8d ff ff 	      STA	IRQVEC+1
+    132  c86e		       a9 0a		      LDA	#MPTR_A
+    133  c870		       85 06		      STA	HMEM00
+    134  c872		       a9 0f		      LDA	#MPTR_B
+    135  c874		       85 07		      STA	HMEM00+1
+    136  c876		       a9 14		      LDA	#MPTR_C
+    137  c878		       85 08		      STA	HMEM00+2
+    138  c87a		       a9 19		      LDA	#MPTR_D
+    139  c87c		       85 09		      STA	HMEM00+3
+    140  c87e		       a9 00		      LDA	#$00
+    141  c880		       85 0b		      STA	$0B
+    142  c882		       85 0d		      STA	$0D
+    143  c884		       85 10		      STA	$10
+    144  c886		       85 12		      STA	$12
+    145  c888		       85 15		      STA	$15
+    146  c88a		       85 17		      STA	$17
+    147  c88c		       85 1a		      STA	$1A
+    148  c88e		       85 1c		      STA	$1C
+    149  c890		       a9 02		      LDA	#$02	;Make ACIA D a 'copy channel' (not a 4th hubster channel)
+    150  c892		       85 29		      STA	PRTSNO
+    151  c894		       a9 00		      LDA	#$00
+    152  c896		       85 2a		      STA	D_ACTV
+    153  c898		       a2 03		      LDX	#$03	;Write to all 4 ACIA status registers
+    154  c89a		       a0 00		      LDY	#ACSTAT
+    155  c89c		       a9 03	   WR1	      LDA	#$03	;Master reset
+    156  c89e		       20 d5 ca 	      JSR	WRACIA	;Write to ACIA channel (X)
+    157  c8a1		       a9 95		      LDA	#$95	; /16 = 9600 baud, 8 bits + 1 stop bit,
+    158  c8a3		       20 d5 ca 	      JSR	WRACIA	;   receive interrupt enabled
+    159  c8a6		       ca		      DEX
+    160  c8a7		       10 f3		      BPL	WR1
+    161  c8a9		       58		      CLI
+    162  c8aa							;BEGIN MAIN LOOP
+    163  c8aa		       a5 2a	   MAINLP     LDA	D_ACTV	;ACIA D already active? (external HUB)
+    164  c8ac		       d0 0d		      BNE	BRC8BB	; Yes: skip past ACIA D polling-for-start
+    165  c8ae		       ad 80 40 	      LDA	HUB_DS	; No: see if start byte is ready now
+    166  c8b1		       29 01		      AND	#$01	;Receive data register full on ACIA D?
+    167  c8b3		       f0 06		      BEQ	BRC8BB	; No: skip ahead
+    168  c8b5		       ad 81 40 	      LDA	HUB_D	; Yes: grab the data from ACIA D
+    169  c8b8		       20 5c ca 	      JSR	STHTMR	;  and start the HUB timer (and copy process)
+    170  c8bb		       78	   BRC8BB     SEI
+    171  c8bc		       a5 39		      LDA	IN_BUF	;Any incoming data from ACIA(s) to process?
+    172  c8be		       c5 3b		      CMP	OU_BUF
+    173  c8c0		       f0 45		      BEQ	MLOOPX	; No: skip to end of main loop
+    174  c8c2		       a0 00		      LDY	#$00	; Yes: read it in to the appropriate place in HUB memory
+    175  c8c4		       b1 3b		      LDA	(OU_BUF),Y	; Get data byte
+    176  c8c6		       85 1e		      STA	INBYTE
+    177  c8c8		       e6 3b		      INC	OU_BUF
+    178  c8ca		       b1 3b		      LDA	(OU_BUF),Y	;Get HUB channel
+    179  c8cc		       aa		      TAX		; stash it in X
+    180  c8cd		       86 28		      STX	HUBCHN	; and in var
+    181  c8cf		       e6 3b		      INC	OU_BUF
+    182  c8d1		       a5 3d		      LDA	IN_BLOC	;Read interrupts disabled (to catch up)?
+    183  c8d3		       f0 0f		      BEQ	BRC8E4	; No: skip to processing command from queue
+    184  c8d5		       c6 3d		      DEC	IN_BLOC
+    185  c8d7		       d0 0b		      BNE	BRC8E4
+    186  c8d9		       a9 95		      LDA	#$95	;Re-enable read interrupts
+    187  c8db		       8d 10 40 	      STA	HUB_AS	; (and set /16 (9600 baud)) on ACIAs A,B and C
+    188  c8de		       8d 20 40 	      STA	HUB_BS
+    189  c8e1		       8d 40 40 	      STA	HUB_CS
+    190  c8e4		       58	   BRC8E4     CLI
+    191  c8e5		       b5 06		      LDA	HMEM00,X	;Get the base address for this Hub channel's alloted memory
+    192  c8e7		       85 24		      STA	ADRPTR
+    193  c8e9		       a9 0f		      LDA	#$0F
+    194  c8eb		       25 1e		      AND	INBYTE
+    195  c8ed		       85 20		      STA	DATA	;Data nibble from incoming Command/Data byte
+    196  c8ef		       a9 f0		      LDA	#$F0
+    197  c8f1		       25 1e		      AND	INBYTE
+    198  c8f3		       85 1e		      STA	INBYTE	;Shift the 'command nibble' into place
+    199  c8f5		       4a		      LSR		; which indexes CMDTAB, below
+    200  c8f6		       4a		      LSR
+    201  c8f7		       4a		      LSR
+    202  c8f8		       aa		      TAX
+    203  c8f9		       bd 0e c9 	      LDA	CMDTAB,X
+    204  c8fc		       85 22		      STA	CMDVEC
+    205  c8fe		       e8		      INX
+    206  c8ff		       bd 0e c9 	      LDA	CMDTAB,X
+    207  c902		       85 23		      STA	CMDVEC+1
+    208  c904		       6c 22 00 	      JMP	(CMDVEC)
+    209  c907		       58	   MLOOPX     CLI
+    210  c908		       20 02 cb 	      JSR	UPDDSP
+    211  c90b		       4c aa c8    JUMP00     JMP	MAINLP	;End of main loop
+    212  c90e
+    213  c90e		       b1 c9	   CMDTAB     .WORD.w	CMD_00	;Set write address LO nibble
+    214  c910		       b9 c9		      .WORD.w	CMD_01	;Set write address MID nibble
+    215  c912		       c1 c9		      .WORD.w	CMD_02	;Set write address HI nibble
+    216  c914		       c9 c9		      .WORD.w	CMD_03	;Write lo nibble of byte to write address
+    217  c916		       d1 c9		      .WORD.w	CMD_04	;Write hi nibble of byte to write address
+    218  c918		       dc c9		      .WORD.w	CMD_05	;Add offset to write address
+    219  c91a		       f3 c9		      .WORD.w	CMD_06	;Write hi nibble of byte and increment write address
+    220  c91c		       03 ca		      .WORD.w	CMD_07	;NOP
+    221  c91e		       07 ca		      .WORD.w	CMD_08	;Set read address LO nibble
+    222  c920		       0f ca		      .WORD.w	CMD_09	;Set read address MID nibble
+    223  c922		       17 ca		      .WORD.w	CMD_0A	;Set read address HI nibble
+    224  c924		       1f ca		      .WORD.w	CMD_0B	;Read byte
+    225  c926		       2a ca		      .WORD.w	CMD_0C	;Read and increment read address
+    226  c928		       3a ca		      .WORD.w	CMD_0D	;Read HUB timer lo byte
+    227  c92a		       42 ca		      .WORD.w	CMD_0E	;Read HUB timer hi byte
+    228  c92c		       4a ca		      .WORD.w	CMD_0F	;Start HUB timer
+    229  c92e
+    230  c92e		       74	   DSPDAT     .BYTE.b	$74	;Codes for "hub 3.1" message on display
+    231  c92f		       1c		      .BYTE.b	$1C
+    232  c930		       7c		      .BYTE.b	$7C
+    233  c931		       00		      .BYTE.b	$00
+    234  c932		       86		      .BYTE.b	$86
+    235  c933		       bb		      .BYTE.b	$BB
+    236  c934
+    237  c934		       98	   L_HNIB     TYA		;Set HI or LO nibble of read or write address
+    238  c935		       29 01		      AND	#$01
+    239  c937		       d0 09		      BNE	SETHIX
+    240  c939		       b1 24		      LDA	(ADRPTR),Y	;Set LO nibble
+    241  c93b		       29 f0		      AND	#$F0
+    242  c93d		       05 20		      ORA	DATA
+    243  c93f		       91 24		      STA	(ADRPTR),Y
+    244  c941		       60		      RTS
+    245  c942
+    246  c942		       18	   SETHIX     CLC		;Set HI nibble
+    247  c943		       b1 24		      LDA	(ADRPTR),Y
+    248  c945		       29 f0		      AND	#$F0
+    249  c947		       05 20		      ORA	DATA
+    250  c949		       69 03		      ADC	#>HL_MEM	;Hub memory is at $300
+    251  c94b		       91 24		      STA	(ADRPTR),Y
+    252  c94d		       60		      RTS
+    253  c94e
+    254  c94e		       b1 24	   MIDNIB     LDA	(ADRPTR),Y	;Set MID nibble of read or write address
+    255  c950		       29 0f		      AND	#$0F
+    256  c952		       06 20		      ASL	DATA
+    257  c954		       06 20		      ASL	DATA
+    258  c956		       06 20		      ASL	DATA
+    259  c958		       06 20		      ASL	DATA
+    260  c95a		       05 20		      ORA	DATA
+    261  c95c		       91 24		      STA	(ADRPTR),Y
+    262  c95e		       60		      RTS
+    263  c95f
+    264  c95f		       b1 24	   PREPRW     LDA	(ADRPTR),Y	;Set up memory pointer
+    265  c961		       85 26		      STA	MEMORY
+    266  c963		       c8		      INY
+    267  c964		       b1 24		      LDA	(ADRPTR),Y
+    268  c966		       85 27		      STA	MEMORY+1
+    269  c968		       60		      RTS
+    270  c969
+    271  c969		       a0 00	   WRITEX     LDY	#WRI_PT	;Write current data byte to current MEMORY address
+    272  c96b		       20 5f c9 	      JSR	PREPRW
+    273  c96e		       a0 04		      LDY	#DAT_PT
+    274  c970		       b1 24		      LDA	(ADRPTR),Y
+    275  c972		       a0 00		      LDY	#WRI_PT
+    276  c974		       91 26		      STA	(MEMORY),Y
+    277  c976		       60		      RTS
+    278  c977
+    279  c977		       18	   INCADR     CLC
+    280  c978		       b1 24		      LDA	(ADRPTR),Y
+    281  c97a		       69 01		      ADC	#$01
+    282  c97c		       91 24		      STA	(ADRPTR),Y
+    283  c97e		       90 08		      BCC	BRC988
+    284  c980		       18		      CLC
+    285  c981		       c8		      INY
+    286  c982		       b1 24		      LDA	(ADRPTR),Y
+    287  c984		       69 01		      ADC	#$01
+    288  c986		       91 24		      STA	(ADRPTR),Y
+    289  c988		       60	   BRC988     RTS
+    290  c989
+    291  c989		       a6 28	   READXX     LDX	HUBCHN	;Read data byte from current MEMORY address
+    292  c98b		       a0 00		      LDY	#ACSTAT	; and write it to requesting HUB channel
+    293  c98d		       20 aa ca    BRC98D     JSR	RDACIA	;Wait for that ACIA to be ready to transmit
+    294  c990		       29 02		      AND	#$02
+    295  c992		       f0 f9		      BEQ	BRC98D
+    296  c994		       a0 00		      LDY	#$00
+    297  c996		       b1 26		      LDA	(MEMORY),Y
+    298  c998		       a0 01		      LDY	#ACDATA
+    299  c99a		       20 d5 ca 	      JSR	WRACIA	;Write data byte to ACIA (X) data register
+    300  c99d		       60		      RTS
+    301  c99e
+    302  c99e		       a6 28	   BYTOUT     LDX	HUBCHN
+    303  c9a0		       a0 00		      LDY	#ACSTAT
+    304  c9a2		       48		      PHA
+    305  c9a3		       20 aa ca    BRC9A3     JSR	RDACIA	;Read ACIA status register
+    306  c9a6		       29 02		      AND	#$02
+    307  c9a8		       f0 f9		      BEQ	BRC9A3
+    308  c9aa		       68		      PLA
+    309  c9ab		       a0 01		      LDY	#ACDATA
+    310  c9ad		       20 d5 ca 	      JSR	WRACIA	;Write to ACIA data register
+    311  c9b0		       60		      RTS
+    312  c9b1
+    313  c9b1							; Commands received from Hubster ACIAs
+    314  c9b1		       a0 00	   CMD_00     LDY	#WRI_PT	;Set write address LO nibble
+    315  c9b3		       20 34 c9 	      JSR	L_HNIB
+    316  c9b6		       4c 0b c9 	      JMP	JUMP00
+    317  c9b9
+    318  c9b9		       a0 00	   CMD_01     LDY	#WRI_PT	;Set write address MID nibble
+    319  c9bb		       20 4e c9 	      JSR	MIDNIB
+    320  c9be		       4c 0b c9 	      JMP	JUMP00
+    321  c9c1
+    322  c9c1		       a0 01	   CMD_02     LDY	#WRI_PT+1	;Set write address HI nibble
+    323  c9c3		       20 34 c9 	      JSR	L_HNIB
+    324  c9c6		       4c 0b c9 	      JMP	JUMP00
+    325  c9c9
+    326  c9c9		       a0 04	   CMD_03     LDY	#DAT_PT	;Write lo nibble of byte
+    327  c9cb		       20 34 c9 	      JSR	L_HNIB
+    328  c9ce		       4c 0b c9 	      JMP	JUMP00
+    329  c9d1
+    330  c9d1		       a0 04	   CMD_04     LDY	#DAT_PT	;Write hi nibble of byte to write address
+    331  c9d3		       20 4e c9 	      JSR	MIDNIB
+    332  c9d6		       20 69 c9 	      JSR	WRITEX
+    333  c9d9		       4c 0b c9 	      JMP	JUMP00
+    334  c9dc
+    335  c9dc		       18	   CMD_05     CLC		;Add data value to the write address
+    336  c9dd		       a0 00		      LDY	#WRI_PT
+    337  c9df		       b1 24		      LDA	(ADRPTR),Y
+    338  c9e1		       65 20		      ADC	DATA
+    339  c9e3		       91 24		      STA	(ADRPTR),Y
+    340  c9e5		       90 09		      BCC	BRC9F0
+    341  c9e7		       18		      CLC
+    342  c9e8		       a0 01		      LDY	#WRI_PT+1
+    343  c9ea		       b1 24		      LDA	(ADRPTR),Y
+    344  c9ec		       69 01		      ADC	#$01
+    345  c9ee		       91 24		      STA	(ADRPTR),Y
+    346  c9f0		       4c 0b c9    BRC9F0     JMP	JUMP00
+    347  c9f3
+    348  c9f3		       a0 04	   CMD_06     LDY	#DAT_PT	;Write hi nibble of byte and incrememnt write address
+    349  c9f5		       20 4e c9 	      JSR	MIDNIB
+    350  c9f8		       20 69 c9 	      JSR	WRITEX
+    351  c9fb		       a0 00		      LDY	#WRI_PT
+    352  c9fd		       20 77 c9 	      JSR	INCADR
+    353  ca00		       4c 0b c9 	      JMP	JUMP00
+    354  ca03
+    355  ca03		       ea	   CMD_07     NOP		;Placeholder
+    356  ca04		       4c 0b c9 	      JMP	JUMP00
+    357  ca07
+    358  ca07		       a0 02	   CMD_08     LDY	#REA_PT	;Set read address LO nibble
+    359  ca09		       20 34 c9 	      JSR	L_HNIB
+    360  ca0c		       4c 0b c9 	      JMP	JUMP00
+    361  ca0f
+    362  ca0f		       a0 02	   CMD_09     LDY	#REA_PT	;Set read address MID nibble
+    363  ca11		       20 4e c9 	      JSR	MIDNIB
+    364  ca14		       4c 0b c9 	      JMP	JUMP00
+    365  ca17
+    366  ca17		       a0 03	   CMD_0A     LDY	#REA_PT+1	;Set read address HI nibble
+    367  ca19		       20 34 c9 	      JSR	L_HNIB
+    368  ca1c		       4c 0b c9 	      JMP	JUMP00
+    369  ca1f
+    370  ca1f		       a0 02	   CMD_0B     LDY	#REA_PT	;Read byte from MEMORY and write to requesting Hub channel
+    371  ca21		       20 5f c9 	      JSR	PREPRW
+    372  ca24		       20 89 c9 	      JSR	READXX
+    373  ca27		       4c 0b c9 	      JMP	JUMP00
+    374  ca2a
+    375  ca2a		       a0 02	   CMD_0C     LDY	#REA_PT	;Read byte and increment read address
+    376  ca2c		       20 5f c9 	      JSR	PREPRW
+    377  ca2f		       20 89 c9 	      JSR	READXX
+    378  ca32		       a0 02		      LDY	#REA_PT
+    379  ca34		       20 77 c9 	      JSR	INCADR
+    380  ca37		       4c 0b c9 	      JMP	JUMP00
+    381  ca3a
+    382  ca3a		       a5 00	   CMD_0D     LDA	HTIMER	;Read HUB timer lo
+    383  ca3c		       20 9e c9 	      JSR	BYTOUT
+    384  ca3f		       4c 0b c9 	      JMP	JUMP00
+    385  ca42		       a5 01	   CMD_0E     LDA	HTIMER+1	;Read HUB timer hi
+    386  ca44		       20 9e c9 	      JSR	BYTOUT
+    387  ca47		       4c 0b c9 	      JMP	JUMP00
+    388  ca4a
+    389  ca4a		       a5 20	   CMD_0F     LDA	DATA	;Start HUB timer
+    390  ca4c		       c9 01		      CMP	#$01
+    391  ca4e		       d0 06		      BNE	BRCA56
+    392  ca50		       20 8f ca 	      JSR	CLRDSP
+    393  ca53		       4c 0b c9 	      JMP	JUMP00
+    394  ca56		       20 5c ca    BRCA56     JSR	STHTMR
+    395  ca59		       4c 0b c9 	      JMP	JUMP00
+    396  ca5c
+    397  ca5c							;Start HUB timer and enable interrupts from channel D (external copy)
+    398  ca5c		       78	   STHTMR     SEI
+    399  ca5d		       a9 c0		      LDA	#$C0
+    400  ca5f		       8d 0b a0 	      STA	V1_ACR	;V1 Timer 1 is free-running
+    401  ca62		       a9 00		      LDA	#$00
+    402  ca64		       8d 0b a8 	      STA	V2_ACR	;V2 Timer 1 is one-shot
+    403  ca67		       a9 7f		      LDA	#$7F
+    404  ca69		       8d 0e a0 	      STA	V1_IER
+    405  ca6c		       8d 0e a8 	      STA	V2_IER
+    406  ca6f		       a9 e0		      LDA	#$E0
+    407  ca71		       8d 0e a0 	      STA	V1_IER
+    408  ca74		       a9 a0		      LDA	#$A0
+    409  ca76		       8d 0e a8 	      STA	V2_IER
+    410  ca79		       a9 1a		      LDA	#$1A	;Set V1 Timer 1 to $411A (16.667 mSecs, or 60 Hz)
+    411  ca7b		       8d 04 a0 	      STA	V1T1CL
+    412  ca7e		       a9 41		      LDA	#$41
+    413  ca80		       8d 05 a0 	      STA	V1T1CL+1
+    414  ca83		       a9 b6		      LDA	#$B6	;Config. ACIA D: /64 (2400 baud) - 8 bits + 1 stop bit,
+    415  ca85		       8d 80 40 	      STA	HUB_DS	;  enable receive AND transmit interrupts
+    416  ca88		       a9 ff		      LDA	#$FF
+    417  ca8a		       85 2a		      STA	D_ACTV
+    418  ca8c		       8d 81 40 	      STA	HUB_D	; Send "initiator" byte to other HUB to start copy process
+    419  ca8f		       78	   CLRDSP     SEI		;Reset HUB timer and clear display
+    420  ca90		       a9 00		      LDA	#$00
+    421  ca92		       85 00		      STA	HTIMER
+    422  ca94		       85 01		      STA	HTIMER+1
+    423  ca96		       85 38		      STA	$38
+    424  ca98		       85 37		      STA	$37
+    425  ca9a		       85 36		      STA	$36
+    426  ca9c		       85 35		      STA	$35
+    427  ca9e		       85 34		      STA	$34
+    428  caa0		       a2 05		      LDX	#$05
+    429  caa2		       9d 40 a6    BRCAA2     STA	DSPBUF,X
+    430  caa5		       ca		      DEX
+    431  caa6		       10 fa		      BPL	BRCAA2
+    432  caa8		       58		      CLI
+    433  caa9		       60		      RTS
+    434  caaa
+    435  caaa							; Read byte from HUB channel (X) ACIA, register (Y)
+    436  caaa		       8a	   RDACIA     TXA
+    437  caab		       48		      PHA
+    438  caac		       0a		      ASL
+    439  caad		       aa		      TAX
+    440  caae		       bd bd ca 	      LDA	HBRADR,X
+    441  cab1		       85 2f		      STA	READVC
+    442  cab3		       bd be ca 	      LDA	HBRADR+1,X
+    443  cab6		       85 30		      STA	READVC+1
+    444  cab8		       68		      PLA
+    445  cab9		       aa		      TAX
+    446  caba		       6c 2f 00 	      JMP	(READVC)
+    447  cabd		       c5 ca	   HBRADR     .WORD.w	HUBR0
+    448  cabf		       c9 ca		      .WORD.w	HUBR1
+    449  cac1		       cd ca		      .WORD.w	HUBR2
+    450  cac3		       d1 ca		      .WORD.w	HUBR3
+    451  cac5		       b9 10 40    HUBR0      LDA	HUB_AS,Y
+    452  cac8		       60		      RTS
+    453  cac9		       b9 20 40    HUBR1      LDA	HUB_BS,Y
+    454  cacc		       60		      RTS
+    455  cacd		       b9 40 40    HUBR2      LDA	HUB_CS,Y
+    456  cad0		       60		      RTS
+    457  cad1		       b9 80 40    HUBR3      LDA	HUB_DS,Y
+    458  cad4		       60		      RTS
+    459  cad5
+    460  cad5							; Write byte to HUB channel (X) ACIA, register (Y)
+    461  cad5		       48	   WRACIA     PHA
+    462  cad6		       8a		      TXA
+    463  cad7		       48		      PHA
+    464  cad8		       0a		      ASL
+    465  cad9		       aa		      TAX
+    466  cada		       bd ea ca 	      LDA	HBWADR,X
+    467  cadd		       85 31		      STA	WRITVC
+    468  cadf		       bd eb ca 	      LDA	HBWADR+1,X
+    469  cae2		       85 32		      STA	WRITVC+1
+    470  cae4		       68		      PLA
+    471  cae5		       aa		      TAX
+    472  cae6		       68		      PLA
+    473  cae7		       6c 31 00 	      JMP	(WRITVC)
+    474  caea		       f2 ca	   HBWADR     .WORD.w	HUBW0
+    475  caec		       f6 ca		      .WORD.w	HUBW1
+    476  caee		       fa ca		      .WORD.w	HUBW2
+    477  caf0		       fe ca		      .WORD.w	HUBW3
+    478  caf2		       99 10 40    HUBW0      STA	HUB_AS,Y
+    479  caf5		       60		      RTS
+    480  caf6		       99 20 40    HUBW1      STA	HUB_BS,Y
+    481  caf9		       60		      RTS
+    482  cafa		       99 40 40    HUBW2      STA	HUB_CS,Y
+    483  cafd		       60		      RTS
+    484  cafe		       99 80 40    HUBW3      STA	HUB_DS,Y
+    485  cb01		       60		      RTS
+    486  cb02		       a2 05	   UPDDSP     LDX	#$05
+    487  cb04		       a0 00		      LDY	#$00
+    488  cb06		       bd 40 a6    SCNLUP     LDA	DSPBUF,X
+    489  cb09		       8c 00 a4 	      STY	KBDORA
+    490  cb0c		       8e 02 a4 	      STX	KBDORB
+    491  cb0f		       8d 00 a4 	      STA	KBDORA
+    492  cb12		       ca		      DEX
+    493  cb13		       10 f1		      BPL	SCNLUP
+    494  cb15		       60		      RTS
+    495  cb16
+    496  cb16							; Interrupt service routine
+    497  cb16		       48	   IRQSRV     PHA
+    498  cb17		       8a		      TXA
+    499  cb18		       48		      PHA
+    500  cb19		       98		      TYA
+    501  cb1a		       48		      PHA
+    502  cb1b		       ba		      TSX
+    503  cb1c		       bd 04 01 	      LDA	$0104,X
+    504  cb1f		       29 10		      AND	#$10
+    505  cb21		       f0 08		      BEQ	NOBRK
+    506  cb23		       68		      PLA
+    507  cb24		       a8		      TAY
+    508  cb25		       68		      PLA
+    509  cb26		       aa		      TAX
+    510  cb27		       68		      PLA
+    511  cb28		       6c f6 ff 	      JMP	(USRBRK)
+    512  cb2b
+    513  cb2b		       a0 00	   NOBRK      LDY	#$00
+    514  cb2d		       a6 29		      LDX	PRTSNO
+    515  cb2f		       e0 03		      CPX	#$03
+    516  cb31		       90 0c		      BCC	CHK_C
+    517  cb33		       ad 80 40 	      LDA	HUB_DS	; Any data ready from ACIA D?
+    518  cb36		       10 06		      BPL	CHECK_C
+    519  cb38		       ad 81 40 	      LDA	HUB_D	; Yes: grab it
+    520  cb3b		       20 82 cb 	      JSR	STOREB
+    521  cb3e		       ca	   CHECK_C    DEX
+    522  cb3f		       ad 40 40    CHK_C      LDA	HUB_CS	; Any data ready from ACIA C?
+    523  cb42		       10 06		      BPL	CHECKB
+    524  cb44		       ad 41 40 	      LDA	HUB_C	; Yes: grab it
+    525  cb47		       20 82 cb 	      JSR	STOREB
+    526  cb4a		       ca	   CHECKB     DEX
+    527  cb4b		       ad 20 40 	      LDA	HUB_BS	; Any data ready from ACIA B?
+    528  cb4e		       10 06		      BPL	CHECKA
+    529  cb50		       ad 21 40 	      LDA	HUB_B	; Yes: grab it
+    530  cb53		       20 82 cb 	      JSR	STOREB
+    531  cb56		       ca	   CHECKA     DEX
+    532  cb57		       ad 10 40 	      LDA	HUB_AS	; Any data ready from ACIA A?
+    533  cb5a		       10 06		      BPL	CHECKT
+    534  cb5c		       ad 11 40 	      LDA	HUB_A	; Yes: grab it
+    535  cb5f		       20 82 cb 	      JSR	STOREB
+    536  cb62		       ad 0d a0    CHECKT     LDA	V1_IFR	; Is this a V1 timer interrupt?
+    537  cb65		       85 41		      STA	V1IFLG
+    538  cb67		       8d 0d a0 	      STA	V1_IFR	; Clear all bits in V1 IFR
+    539  cb6a		       10 3b		      BPL	GOJUMP
+    540  cb6c		       29 40		      AND	#$40	; Timeout of timer 1?
+    541  cb6e		       f0 37		      BEQ	GOJUMP
+    542  cb70		       e6 00		      INC	HTIMER	; Yes: increment Hub timer count
+    543  cb72		       d0 02		      BNE	BRCB76
+    544  cb74		       e6 01		      INC	HTIMER+1
+    545  cb76		       20 14 cc    BRCB76     JSR	SCAN_D
+    546  cb79		       4c a7 cb 	      JMP	GOJUMP
+    547  cb7c
+    548  cb7c		       68	   IRQOUT     PLA
+    549  cb7d		       a8		      TAY
+    550  cb7e		       68		      PLA
+    551  cb7f		       aa		      TAX
+    552  cb80		       68		      PLA
+    553  cb81		       40		      RTI
+    554  cb82
+    555  cb82
+    556  cb82		       91 39	   STOREB     STA	(IN_BUF),Y	;Stash byte
+    557  cb84		       e6 39		      INC	IN_BUF
+    558  cb86		       8a		      TXA
+    559  cb87		       91 39		      STA	(IN_BUF),Y	; and the channel it came from
+    560  cb89		       e6 39		      INC	IN_BUF
+    561  cb8b		       a5 39		      LDA	IN_BUF
+    562  cb8d		       18		      CLC
+    563  cb8e		       69 10		      ADC	#$10	;Check to see if we're not keeping up with incoming
+    564  cb90		       c5 3b		      CMP	OU_BUF
+    565  cb92		       d0 12		      BNE	BRCBA6	; Everything's ok -- keep going
+    566  cb94		       a9 55		      LDA	#$55	;We're falling behind against incoming data:
+    567  cb96		       8d 10 40 	      STA	HUB_AS	; Temporarily disable ACIA A,B and C read interrupts
+    568  cb99		       8d 20 40 	      STA	HUB_BS
+    569  cb9c		       8d 40 40 	      STA	HUB_CS
+    570  cb9f		       a9 02		      LDA	#$02	; Keep 'em disabled for 2 main loops
+    571  cba1		       85 3d		      STA	IN_BLOC
+    572  cba3		       20 72 89 	      JSR	BEEP	; Make a beep to signal overrun
+    573  cba6		       60	   BRCBA6     RTS
+    574  cba7
+    575  cba7		       6c 2b 00    GOJUMP     JMP	(BVECTR)	;This jumps to 'HUBCPY' just below
+    576  cbaa
+    577  cbaa							;Read in copy of external HUB data page - and write out copy of local page to external HUB
+    578  cbaa		       a5 41	   HUBCPY     LDA	V1IFLG	;Check flags from last VIA #1 interrupt
+    579  cbac		       10 0d		      BPL	BRCBBB	; no interrupt -- skip ahead
+    580  cbae		       29 20		      AND	#$20	; V1 timer 2 interrupt?
+    581  cbb0		       f0 09		      BEQ	BRCBBB	; no -- skip ahead
+    582  cbb2		       a9 00		      LDA	#$00	; yes: end PAUSE of memory copy
+    583  cbb4		       85 42		      STA	TPAUSE
+    584  cbb6		       a9 b6		      LDA	#$B6	;Config. ACIA D: x/64 (2400 baud) - 8 bits + 1 stop bit,
+    585  cbb8		       8d 80 40 	      STA	HUB_DS	;  enable receive AND transmit interrupts
+    586  cbbb		       ad 0d a8    BRCBBB     LDA	V2_IFR	;Interrupt on V2? (HubCopy Timeout)
+    587  cbbe		       10 07		      BPL	BRCBC7
+    588  cbc0		       8d 0d a8 	      STA	V2_IFR
+    589  cbc3		       a9 00		      LDA	#$00	;Yes: reset HUB-copy write pointer to beginning of page
+    590  cbc5		       85 2e		      STA	HX_PTR
+    591  cbc7		       ad 80 40    BRCBC7     LDA	HUB_DS	;Check if there's an incoming byte from remote HUB data
+    592  cbca		       85 3e		      STA	DSTATX	;  (a.k.a channel D)
+    593  cbcc		       10 18		      BPL	HCPYOU	;None ready
+    594  cbce		       29 01		      AND	#$01
+    595  cbd0		       f0 14		      BEQ	HCPYOU
+    596  cbd2		       ad 81 40 	      LDA	HUB_D	;One *is* ready - read it in
+    597  cbd5		       a4 2e		      LDY	HX_PTR
+    598  cbd7		       99 00 04 	      STA	HX_MEM,Y	;Stash it...
+    599  cbda		       e6 2e		      INC	HX_PTR	; and increment the pointer
+    600  cbdc		       a9 d2		      LDA	#$D2	;reset V2 Timer 2 (HubCopy Timeout) to $30D2 (12.498 mSec)
+    601  cbde		       8d 08 a8 	      STA	V2T2CL
+    602  cbe1		       a9 30		      LDA	#$30
+    603  cbe3		       8d 09 a8 	      STA	V2T2CL+1
+    604  cbe6		       a5 3e	   HCPYOU     LDA	DSTATX	;Get last ACIA D status
+    605  cbe8		       10 92		      BPL	IRQOUT	; If no interrrupt request, skip out
+    606  cbea		       29 02		      AND	#$02	; If not 'Transmit Data Register Empty'
+    607  cbec		       f0 8e		      BEQ	IRQOUT	;     -- skip out
+    608  cbee		       24 42		      BIT	TPAUSE	; If in 'pause' state of mem. copy
+    609  cbf0		       30 8a		      BMI	IRQOUT	;     -- skip out
+    610  cbf2		       a4 2d		      LDY	HCPY_F	; Get current copy-from pointer
+    611  cbf4		       e6 2d		      INC	HCPY_F	; Increment copy-from pointer
+    612  cbf6		       d0 13		      BNE	BRCC0B	; If no page wrap, skip to writing byte out
+    613  cbf8		       a9 5e		      LDA	#$5E	;At page wrap: go into 21 mSec pause, for synchronization
+    614  cbfa		       8d 08 a0 	      STA	V1T2CL	;Set VIA #1 Timer 2 to $515E (20.830 mSec)
+    615  cbfd		       a9 51		      LDA	#$51
+    616  cbff		       8d 09 a0 	      STA	V1T2CL+1
+    617  cc02		       a9 ff		      LDA	#$FF
+    618  cc04		       85 42		      STA	TPAUSE
+    619  cc06		       a9 96		      LDA	#$96	;Enable RECEIVE but NOT TRANSMIT interrupts on ACIA D
+    620  cc08		       8d 80 40 	      STA	HUB_DS
+    621  cc0b		       b9 00 03    BRCC0B     LDA	HL_MEM,Y
+    622  cc0e		       8d 81 40 	      STA	HUB_D	;Write current 'copy' byte to ACIA D (remote HUB)
+    623  cc11		       4c 7c cb 	      JMP	IRQOUT
+    624  cc14
+    625  cc14
+    626  cc14		       e6 38	   SCAN_D     INC	$38	;Scan the display (? Not totally sure what else it does)
+    627  cc16		       a5 38		      LDA	$38
+    628  cc18		       c9 3c		      CMP	#$3C
+    629  cc1a		       90 2a		      BCC	BRCC46
+    630  cc1c		       a9 00		      LDA	#$00
+    631  cc1e		       85 38		      STA	$38
+    632  cc20		       e6 37		      INC	$37
+    633  cc22		       a5 37		      LDA	$37
+    634  cc24		       c9 0a		      CMP	#$0A
+    635  cc26		       90 1e		      BCC	BRCC46
+    636  cc28		       a9 00		      LDA	#$00
+    637  cc2a		       85 37		      STA	$37
+    638  cc2c		       e6 36		      INC	$36
+    639  cc2e		       a5 36		      LDA	$36
+    640  cc30		       c9 06		      CMP	#$06
+    641  cc32		       90 12		      BCC	BRCC46
+    642  cc34		       a9 00		      LDA	#$00
+    643  cc36		       85 36		      STA	$36
+    644  cc38		       e6 35		      INC	$35
+    645  cc3a		       a5 35		      LDA	$35
+    646  cc3c		       c9 0a		      CMP	#$0A
+    647  cc3e		       90 06		      BCC	BRCC46
+    648  cc40		       a9 00		      LDA	#$00
+    649  cc42		       85 35		      STA	$35
+    650  cc44		       e6 34		      INC	$34
+    651  cc46		       a2 03	   BRCC46     LDX	#$03
+    652  cc48		       b5 34	   BRCC48     LDA	$34,X
+    653  cc4a		       a8		      TAY
+    654  cc4b		       b9 29 8c 	      LDA	SEGSM1,Y
+    655  cc4e		       9d 42 a6 	      STA	DSPBUF+2,X
+    656  cc51		       ca		      DEX
+    657  cc52		       10 f4		      BPL	BRCC48
+    658  cc54		       60		      RTS
+    659  cc55
+    660  cc55							;Reset ALL ACIAs
+    661  cc55		       a9 03	   RSTTRG     LDA	#$03
+    662  cc57		       8d 10 40 	      STA	HUB_AS
+    663  cc5a		       8d 20 40 	      STA	HUB_BS
+    664  cc5d		       8d 40 40 	      STA	HUB_CS
+    665  cc60		       8d 80 40 	      STA	HUB_DS
+    666  cc63		       6c 3f 00 	      JMP	($003F)
+    667  cc63					      .END
