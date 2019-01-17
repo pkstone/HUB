@@ -11,7 +11,7 @@
      10  0200		       a6 40	   DSPBUF     =	$A640	;6532 System RAM: Display Buffer
      11  0200
      12  0200
-     13  0200							;------ PORTS
+     13  0200							;--------- PORTS
      14  0200		       a8 06	   T1LL       =	$A806
      15  0200		       a8 05	   T1CH       =	$A805
      16  0200		       a8 0b	   ACR	      =	$A80B
@@ -20,7 +20,7 @@
      19  0200		       a8 08	   T2LL       =	$A808
      20  0200		       a8 09	   T2CH       =	$A809
      21  0200
-     22  0200							;------ VARIABLES
+     22  0200							;--------- VARIABLES
      23  0200		       00 00	   VARS       =	$00
      24  0200		       00 00	   ADNBS3     =	$00	;Four address nibbles for scanning address
      25  0200		       00 01	   ADNBS2     =	$01
@@ -44,7 +44,7 @@
      43  0200		       00 12	   SCRCTR     =	$12	;16-bit score counter
      44  0200							;$13
      45  0200
-     46  0200							;------ MONITOR SUBROUTINES
+     46  0200							;--------- MONITOR SUBROUTINES
      47  0200		       81 c4	   RESALL     =	$81C4
      48  0200		       81 88	   SAVER      =	$8188
      49  0200		       82 75	   ASCNIB     =	$8275
@@ -364,7 +364,7 @@
     363  0412		       68		      PLA
     364  0413		       40		      RTI
     365  0414
-    366  0414				   -------------		;Riff length table
+    366  0414							;--------- Riff length table
     367  0414		       02 00	   RFLTAB     .WORD.w	2
     368  0416		       03 00		      .WORD.w	3
     369  0418		       04 00		      .WORD.w	4
