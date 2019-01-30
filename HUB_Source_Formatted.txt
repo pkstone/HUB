@@ -1,104 +1,104 @@
 ------- FILE Hub.asm LEVEL 1 PASS 2
 	  1  0000							processor	6502
-	  2  0000							;------------------------------------------------------------
-	  3  0000							;SYM-HUB: RS232 Mailbox for 3 Hubsters, 84 bytes apiece
-	  4  0000							;  -- connects to an identical box for 3 more Hubsters
-	  5  0000							; author Phil Stone, 1987
-	  6  0000							;
-	  7  0000							; Source recreated from machine code of original SYM HUB ROM
-	  8  0000							;  -- assembles back to identical machine code as in ROM
-	  9  0000							;------------------------------------------------------------
+	  2  0000			;------------------------------------------------------------
+	  3  0000			;SYM-HUB: RS232 Mailbox for 3 Hubsters, 84 bytes apiece
+	  4  0000			;  -- connects to an identical box for 3 more Hubsters
+	  5  0000			; author Phil Stone, 1987
+	  6  0000			;
+	  7  0000			; Source recreated from machine code of original SYM HUB ROM
+	  8  0000			;  -- assembles back to identical machine code as in ROM
+	  9  0000			;------------------------------------------------------------
 	 10  0000	
      11  c800				   .	 	=	$C800
      12  c800
-     13  c800							;---------   CONSTANTS
-     14  c800							;OFFSETS into 5-byte read/write info:
-     15  c800	00 00	   WRI_PT	=	$00		;WRITE_PTR(2 bytes)
-     16  c800	00 02	   REA_PT	=	$02		;READ_PTR(2 bytes)
-     17  c800	00 04	   DAT_PT	=	$04		;Data
-     18  c800	00 00	   ACSTAT	=	$00		;ACIA register offsets
-     19  c800	00 01	   ACDATA	=	$01
+     13  c800			;---------   CONSTANTS
+     14  c800			; OFFSETS into 5-byte read/write info:
+     15  c800				WRI_PT	=	$00		;WRITE_PTR(2 bytes)
+     16  c800				REA_PT	=	$02		;READ_PTR(2 bytes)
+     17  c800				DAT_PT	=	$04		;Data
+     18  c800				ACSTAT	=	$00		;ACIA register offsets
+     19  c800				ACDATA	=	$01
      20  c800
-     21  c800							;----------   ZERO PAGE VARIABLES
-     22  c800	00 00	   HTIMER	=	$00		;$00 - $01 HUB timer: 60Hz 16-bit count since start or reset
-     23  c800	00 06	   HMEM00	=	$06		;$06 - $09 channel pointers to hub memory pointers & data
-     24  c800	00 0a	   MPTR_A	=	$0A		;5 bytes of read/write ptrs & data for channel A
-     25  c800	00 0f	   MPTR_B	=	$0F		;5 bytes of read/write ptrs & data for channel B
-     26  c800	00 14	   MPTR_C	=	$14		;5 bytes of read/write ptrs & data for channel C
-     27  c800	00 19	   MPTR_D	=	$19		;5 bytes of read/write ptrs & data for channel D
-     28  c800	00 1e	   INBYTE	=	$1E		;incoming byte (command nibble | data nibble)
-     29  c800	00 20	   DATANB	=	$20		;data nibble
-     30  c800	00 22	   CMDVEC	=	$0022	;2-byte command vector
-     31  c800	00 24	   ADRPTR	=	$24		;pointer to read and write pointers for each channel
-     32  c800	00 26	   MEMORY	=	$26		;pointer into actual storage ($300-$4FF)
-     33  c800	00 28	   HUBCHN	=	$28		;Hub channel 0-3
-     34  c800	00 29	   PRTSNO	=	$29		;set to 2 to use PORT D as extra Hubster (no copy channel)
-     35  c800	00 2a	   D_ACTV	=	$2A		;Hub-to-Hub copy operation (on 'D' ACIAs) active?
-     36  c800	00 2b	   BVECTR	=	$2B		;two-byte jump vector
-     37  c800	00 2d	   HCPY_F	=	$2D		;HUB copy (from) pointer
-     38  c800	00 2e	   HX_PTR	=	$2E		;pointer to 'external' page of Hub memory, for copying operation
-     39  c800	00 2f	   READVC	=	$002F	;ACIA Read vector (2 bytes)
-     40  c800	00 31	   WRITVC	=	$0031	;ACIA Write vector (2 bytes)
-     41  c800	00 34	   HTDSP0	=	$34		;Hub timer display digits
-     42  c800	00 35	   HTDSP1	=	$35
-     43  c800	00 36	   HTDSP2	=	$36
-     44  c800	00 37	   HTDSP3	=	$37
-     45  c800	00 38	   HTDSP4	=	$38
-     46  c800	00 39	   IN_BUF	=	$39		;input buffer pointer (2 bytes)
-     47  c800	00 3b	   OU_BUF	=	$3B		;output (processed) buffer pointer (2 bytes)
-     48  c800	00 3d	   INBLOC	=	$3D		;block incoming data? (overrun)
-     49  c800	00 3e	   DSTATX	=	$3E		;copy of last ACIA channel D status
-     50  c800	00 3f	   XRSTVC	=	$003F	;2-byte custom reset vector
-     51  c800	00 41	   V1IFLG	=	$41		;copy of last VIA #1 interrupt flags
-     52  c800	00 42	   TPAUSE	=	$42		;Boolean: in 'pause' state of HUB memory copy?
+     21  c800			;----------   ZERO PAGE VARIABLES
+     22  c800				HTIMER	=	$00		;$00 - $01 HUB timer: 60Hz 16-bit count since start or reset
+     23  c800				HMEM00	=	$06		;$06 - $09 channel pointers to hub memory pointers & data
+     24  c800				MPTR_A	=	$0A		;5 bytes of read/write ptrs & data for channel A
+     25  c800				MPTR_B	=	$0F		;5 bytes of read/write ptrs & data for channel B
+     26  c800				MPTR_C	=	$14		;5 bytes of read/write ptrs & data for channel C
+     27  c800				MPTR_D	=	$19		;5 bytes of read/write ptrs & data for channel D
+     28  c800				INBYTE	=	$1E		;incoming byte (command nibble | data nibble)
+     29  c800				DATANB	=	$20		;data nibble
+     30  c800				CMDVEC	=	$0022	;2-byte command vector
+     31  c800				ADRPTR	=	$24		;pointer to read and write pointers for each channel
+     32  c800				MEMORY	=	$26		;pointer into actual storage ($300-$4FF)
+     33  c800				HUBCHN	=	$28		;Hub channel 0-3
+     34  c800				PRTSNO	=	$29		;set to 2 to use PORT D as extra Hubster (no copy channel)
+     35  c800				D_ACTV	=	$2A		;Hub-to-Hub copy operation (on 'D' ACIAs) active?
+     36  c800				BVECTR	=	$2B		;two-byte jump vector
+     37  c800				HCPY_F	=	$2D		;HUB copy (from) pointer
+     38  c800				HX_PTR	=	$2E		;pointer to 'external' page of Hub memory, for copying operation
+     39  c800				READVC	=	$002F	;ACIA Read vector (2 bytes)
+     40  c800				WRITVC	=	$0031	;ACIA Write vector (2 bytes)
+     41  c800				HTDSP0	=	$34		;Hub timer display digits
+     42  c800				HTDSP1	=	$35
+     43  c800				HTDSP2	=	$36
+     44  c800				HTDSP3	=	$37
+     45  c800				HTDSP4	=	$38
+     46  c800				IN_BUF	=	$39		;input buffer pointer (2 bytes)
+     47  c800				OU_BUF	=	$3B		;output (processed) buffer pointer (2 bytes)
+     48  c800				INBLOC	=	$3D		;block incoming data? (overrun)
+     49  c800				DSTATX	=	$3E		;copy of last ACIA channel D status
+     50  c800				XRSTVC	=	$003F	;2-byte custom reset vector
+     51  c800				V1IFLG	=	$41		;copy of last VIA #1 interrupt flags
+     52  c800				TPAUSE	=	$42		;Boolean: in 'pause' state of HUB memory copy?
      53  c800
-     54  c800							;----------  BUFFER PAGE
-     55  c800	02 00	   BUFPGE	=	$200		; - $2FF: used for input buffering
+     54  c800			;----------  BUFFER PAGE
+     55  c800				BUFPGE	=	$200		; - $2FF: used for input buffering
      56  c800
-     57  c800							;----------  'HUB' SHARED MEMORY
-     58  c800	03 00	   HL_MEM	=	$300		;memory space for 3 local Hub members (84 bytes each)
-     59  c800	04 00	   HX_MEM	=	$400		;memory space for 3 'external' Hub members (84 bytes each)
+     57  c800			;----------  'HUB' SHARED MEMORY
+     58  c800				HL_MEM	=	$300		;memory space for 3 local Hub members (84 bytes each)
+     59  c800				HX_MEM	=	$400		;memory space for 3 'external' Hub members (84 bytes each)
      60  c800
-     61  c800							;----------  4 X 6850 ACIA (Serial interface) chips
-     62  c800	40 10	   HUB_AS	=	$4010	;HUB ACIA A - Control/Status register
-     63  c800	40 11	   HUB_A 	=	$4011	;HUB ACIA A - Data register
-     64  c800	40 20	   HUB_BS	=	$4020	;HUB ACIA B - Control/Status register
-     65  c800	40 21	   HUB_B 	=	$4021	;HUB ACIA B - Data register
-     66  c800	40 40	   HUB_CS	=	$4040	;HUB ACIA C - Control/Status register
-     67  c800	40 41	   HUB_C 	=	$4041	;HUB ACIA C - Data register
-     68  c800	40 80	   HUB_DS	=	$4080	;HUB ACIA D - Control/Status register
-     69  c800	40 81	   HUB_D 	=	$4081	;HUB ACIA D - Data register
+     61  c800			;----------  4 X 6850 ACIA (Serial interface) chips
+     62  c800				HUB_AS	=	$4010	;HUB ACIA A - Control/Status register
+     63  c800				HUB_A 	=	$4011	;HUB ACIA A - Data register
+     64  c800				HUB_BS	=	$4020	;HUB ACIA B - Control/Status register
+     65  c800				HUB_B 	=	$4021	;HUB ACIA B - Data register
+     66  c800				HUB_CS	=	$4040	;HUB ACIA C - Control/Status register
+     67  c800				HUB_C 	=	$4041	;HUB ACIA C - Data register
+     68  c800				HUB_DS	=	$4080	;HUB ACIA D - Control/Status register
+     69  c800				HUB_D 	=	$4081	;HUB ACIA D - Data register
      70  c800
-     71  c800							;----------  SYM Monitor subroutines
-     72  c800	89 72	   BEEP  	=	$8972	;Beep the SYM annunciator
-     73  c800	89 a5	   CONFIG	=	$89A5	;Configure SYM I/O (kbd and display)
-     74  c800	8b 86	   ACCESS	=	$8B86	;Unlock system memory (kbd and display)
-     75  c800	8c 29	   SEGSM1	=	$8C29	;SYM display
+     71  c800			;----------  SYM Monitor subroutines
+     72  c800				BEEP  	=	$8972	;Beep the SYM annunciator
+     73  c800				CONFIG	=	$89A5	;Configure SYM I/O (kbd and display)
+     74  c800				ACCESS	=	$8B86	;Unlock system memory (kbd and display)
+     75  c800				SEGSM1	=	$8C29	;SYM display
      76  c800
-     77  c800							;---------  VIA (6522) #1
-     78  c800	a0 04	   V1T1CL	=	$A004	;VIA 1 Timer 1 Write Latch / Read Counter Low byte
-     79  c800	a0 08	   V1T2CL	=	$A008	;VIA 1 Timer 2 Write Latch / Read Counter Low byte
-     80  c800	a0 0b	   V1_ACR	=	$A00B	;VIA 1 Auxiliary Control Register
-     81  c800	a0 0d	   V1_IFR	=	$A00D	;VIA 1 Interrupt Flag Register
-     82  c800	a0 0e	   V1_IER	=	$A00E	;VIA 1 Interrupt Enable Register
+     77  c800			;---------  VIA (6522) #1
+     78  c800				V1T1CL	=	$A004	;VIA 1 Timer 1 Write Latch / Read Counter Low byte
+     79  c800				V1T2CL	=	$A008	;VIA 1 Timer 2 Write Latch / Read Counter Low byte
+     80  c800				V1_ACR	=	$A00B	;VIA 1 Auxiliary Control Register
+     81  c800				V1_IFR	=	$A00D	;VIA 1 Interrupt Flag Register
+     82  c800				V1_IER	=	$A00E	;VIA 1 Interrupt Enable Register
      83  c800
-     84  c800							;---------  6532 (which includes system RAM)
-     85  c800	a4 00	   KBDORA	=	$A400	;6532 Output register A (Keyboard columns)
-     86  c800	a4 02	   KBDORB	=	$A402	;6532 Output register B (Keyboard rows)
-     87  c800	a6 40	   DSPBUF	=	$A640	;6532 System RAM: Display Buffer
+     84  c800			;---------  6532 (which includes system RAM)
+     85  c800				KBDORA	=	$A400	;6532 Output register A (Keyboard columns)
+     86  c800				KBDORB	=	$A402	;6532 Output register B (Keyboard rows)
+     87  c800				DSPBUF	=	$A640	;6532 System RAM: Display Buffer
      88  c800
-     89  c800							;---------  VIA (6522) #2
-     90  c800	a8 08	   V2T2CL	=	$A808	;VIA 2 Timer 2 Write Latch / Read Counter Low byte
-     91  c800	a8 0b	   V2_ACR	=	$A80B	;VIA 2 Auxiliary Control Register
-     92  c800	a8 0d	   V2_IFR	=	$A80D	;VIA 2 Interrupt Flag Register
-     93  c800	a8 0e	   V2_IER	=	$A80E	;VIA 2 Interrupt Enable Register
+     89  c800			;---------  VIA (6522) #2
+     90  c800				V2T2CL	=	$A808	;VIA 2 Timer 2 Write Latch / Read Counter Low byte
+     91  c800				V2_ACR	=	$A80B	;VIA 2 Auxiliary Control Register
+     92  c800				V2_IFR	=	$A80D	;VIA 2 Interrupt Flag Register
+     93  c800				V2_IER	=	$A80E	;VIA 2 Interrupt Enable Register
      94  c800
-     95  c800	ff f6	   USRBRK	=	$FFF6	;user break vector
-     96  c800	ff fc	   RSTVEC	=	$FFFC	;reset vector
-     97  c800	ff fe	   IRQVEC	=	$FFFE	;interrupt vector
+     95  c800				USRBRK	=	$FFF6	;user break vector
+     96  c800				RSTVEC	=	$FFFC	;reset vector
+     97  c800				IRQVEC	=	$FFFE	;interrupt vector
      98  c800
      99  c800
-    100  c800						;---------- INITIALIZATION
+    100  c800			;---------- INITIALIZATION
     101  c800
     102  c800	78					SEI
     103  c801	20 86 8b				JSR	ACCESS		;unlock system RAM (display, keyboard)
@@ -180,7 +180,7 @@
     179  c8a7	10 f3				BPL	WR1
     180  c8a9	58					CLI
     181  c8aa
-    182  c8aa						;---------- BEGIN MAIN LOOP
+    182  c8aa			;---------- BEGIN MAIN LOOP
     183  c8aa
     184  c8aa	a5 2a		MAINLP	LDA	D_ACTV		;ACIA D already active? (external HUB)
     185  c8ac	d0 0d				BNE	BRC8BB		; Yes: skip past ACIA D polling-for-start
@@ -232,7 +232,7 @@
     231  c908	20 02 cb				JSR	UPDDSP
     232  c90b	4c aa c8		JUMP00	JMP	MAINLP
     233  c90e
-    234  c90e						;---------- END MAIN LOOP
+    234  c90e			;---------- END MAIN LOOP
     235  c90e
     236  c90e						; Vector values for jump to commands, below
     237  c90e	b1 c9		CMDTAB	.WORD.w	CMD_00	;set write address LO nibble
@@ -419,7 +419,7 @@
     418  ca56	20 5c ca		BRCA56	JSR	STHTMR
     419  ca59	4c 0b c9				JMP	JUMP00
     420  ca5c
-    421  ca5c						; Start HUB timer and enable interrupts from channel D (external copy)
+    421  ca5c			; Start HUB timer and enable interrupts from channel D (external copy)
     422  ca5c	78			STHTMR	SEI
     423  ca5d	a9 c0				LDA	#$C0
     424  ca5f	8d 0b a0				STA	V1_ACR		;V1 Timer 1 is free-running
@@ -457,7 +457,7 @@
     456  caa8	58					CLI
     457  caa9	60					RTS
     458  caaa
-    459  caaa						; Read byte from HUB channel (X) ACIA, register (Y)
+    459  caaa			; Read byte from HUB channel (X) ACIA, register (Y)
     460  caaa	8a			RDACIA	TXA
     461  caab	48					PHA
     462  caac	0a					ASL
@@ -482,7 +482,7 @@
     481  cad1	b9 80 40		HUBR3	LDA	HUB_DS,Y
     482  cad4	60					RTS
     483  cad5
-    484  cad5						; Write byte to HUB channel (X) ACIA, register (Y)
+    484  cad5			; Write byte to HUB channel (X) ACIA, register (Y)
     485  cad5	48			WRACIA	PHA
     486  cad6	8a					TXA
     487  cad7	48					PHA
@@ -518,7 +518,7 @@
     517  cb13	10 f1				BPL	SCNLUP
     518  cb15	60					RTS
     519  cb16
-    520  cb16						; Interrupt service routine
+    520  cb16			; Interrupt service routine
     521  cb16	48			IRQSRV	PHA
     522  cb17	8a					TXA
     523  cb18	48					PHA
@@ -577,8 +577,8 @@
     576  cb80	68					PLA
     577  cb81	40					RTI
     578  cb82
-    579  cb82						; Stash incoming byte (and channel it came from)
-    580  cb82						;  and check for data overrun
+    579  cb82			; Stash incoming byte (and channel it came from)
+    580  cb82			;  and check for data overrun
     581  cb82	91 39		STOREB	STA	(IN_BUF),Y	;stash byte
     582  cb84	e6 39				INC	IN_BUF
     583  cb86	8a					TXA
@@ -600,9 +600,9 @@
     599  cba7
     600  cba7	6c 2b 00		GOJUMP	JMP	(BVECTR)		;this jumps to 'HUBCPY' just below
     601  cbaa
-    602  cbaa						; Hub-Hub copy process
-    603  cbaa						;  Read in copy of external HUB data page,
-    604  cbaa						;  and write out copy of local page to external HUB
+    602  cbaa			; Hub-Hub copy process
+    603  cbaa			;  Read in copy of external HUB data page,
+    604  cbaa			;  and write out copy of local page to external HUB
     605  cbaa	a5 41		HUBCPY	LDA	V1IFLG		;check flags from last VIA #1 interrupt
     606  cbac	10 0d				BPL	BRCBBB		; no interrupt -- skip ahead
     607  cbae	29 20				AND	#$20			;V1 timer 2 interrupt?
@@ -650,7 +650,7 @@
     649  cc0e	8d 81 40				STA	HUB_D		;write current 'copy' byte to ACIA D (remote HUB)
     650  cc11	4c 7c cb				JMP	IRQOUT
     651  cc14
-    652  cc14						; Display Hub timer in stopwatch format
+    652  cc14			; Display Hub timer in stop-watch format
     653  cc14	e6 38		DSP_HT	INC	HTDSP4
     654  cc16	a5 38				LDA	HTDSP4
     655  cc18	c9 3c				CMP	#60
@@ -685,7 +685,7 @@
     684  cc52	10 f4				BPL	BRCC48
     685  cc54	60					RTS
     686  cc55
-    687  cc55						; Reset ALL ACIAs - spliced into system reset
+    687  cc55			; Reset ALL ACIAs - spliced into system reset
     688  cc55	a9 03		RSTTRG	LDA	#3
     689  cc57	8d 10 40				STA	HUB_AS
     690  cc5a	8d 20 40				STA	HUB_BS
