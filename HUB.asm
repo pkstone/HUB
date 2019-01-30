@@ -19,15 +19,14 @@ ACSTAT  = $00		;ACIA register offsets
 ACDATA  = $01
 
 ;----------   ZERO PAGE VARIABLES
-HTIMER  = $00		;HUB timer: 60Hz 16-bit count since start or reset
-					; and $01
-HMEM00  = $06		;$06 - $09 base addresses for each Hub channel
-MPTR_A  = $0A		;5 bytes of read/write ptrs/data for channel A
-MPTR_B  = $0F		;5 bytes of read/write ptrs/data for channel B 
-MPTR_C  = $14		;5 bytes of read/write ptrs/data for channel C
-MPTR_D  = $19		;5 bytes of read/write ptrs/data for channel D
+HTIMER  = $00		;$00 - $01 HUB timer: 60Hz 16-bit count since start or reset
+HMEM00  = $06		;$06 - $09 channel pointers to hub memory pointers & data
+MPTR_A  = $0A		;5 bytes of read/write ptrs & data for channel A
+MPTR_B  = $0F		;5 bytes of read/write ptrs & data for channel B 
+MPTR_C  = $14		;5 bytes of read/write ptrs & data for channel C
+MPTR_D  = $19		;5 bytes of read/write ptrs & data for channel D
 INBYTE  = $1E		;incoming byte (command nibble | data nibble)
-DATA    = $20		;data nibble
+DATANB  = $20		;data nibble
 CMDVEC  = $0022		;2-byte command vector
 ADRPTR  = $24		;pointer to read and write pointers for each channel
 MEMORY  = $26		;pointer into actual storage ($300-$4FF)
@@ -46,7 +45,7 @@ HTDSP3  = $37
 HTDSP4  = $38
 IN_BUF  = $39		;input buffer pointer (2 bytes)
 OU_BUF  = $3B		;output (processed) buffer pointer (2 bytes)
-IN_BLOC = $3D		;block incoming data? (overrun)
+INBLOC  = $3D		;block incoming data? (overrun)
 DSTATX  = $3E		;copy of last ACIA channel D status
 XRSTVC  = $003F		;2-byte custom reset vector
 V1IFLG  = $41		;copy of last VIA #1 interrupt flags
@@ -121,7 +120,7 @@ IRQVEC = $FFFE		;interrupt vector
             STA HX_PTR
             STA IN_BUF
             STA OU_BUF
-            STA IN_BLOC
+            STA INBLOC
             STA ADRPTR+1
             STA TPAUSE
             LDA #>BUFPGE		;in/out buffer: $200-$2FF
@@ -201,20 +200,20 @@ BRC8BB      SEI
             TAX				; stash it in X
             STX HUBCHN		; and in var
             INC OU_BUF
-            LDA IN_BLOC		;read interrupts disabled (to catch up)?
+            LDA INBLOC		;read interrupts disabled (to catch up)?
             BEQ BRC8E4		; No: skip to processing command from queue 
-            DEC IN_BLOC
+            DEC INBLOC
             BNE BRC8E4
             LDA #$95			;re-enable read interrupts
             STA HUB_AS		; (and set /16 (9600 baud)) on ACIAs A,B and C
             STA HUB_BS
             STA HUB_CS
 BRC8E4      CLI
-            LDA HMEM00,X		;get the base address for this Hub channel's alloted memory
+            LDA HMEM00,X		;get the base address for this Hub channel's pointers and data
             STA ADRPTR
             LDA #$0F
             AND INBYTE
-            STA DATA			;data nibble from incoming Command/Data byte
+            STA DATANB		;data nibble from incoming Command/Data byte
             LDA #$F0
             AND INBYTE
             STA INBYTE		;shift the 'command nibble' into place
@@ -264,25 +263,25 @@ L_HNIB      TYA				;set HI or LO nibble of read or write address
             BNE SETHIX
             LDA (ADRPTR),Y	;set LO nibble
             AND #$F0
-            ORA DATA
+            ORA DATANB
             STA (ADRPTR),Y
             RTS
 
 SETHIX      CLC				;set HI nibble
             LDA (ADRPTR),Y
             AND #$F0
-            ORA DATA
+            ORA DATANB
             ADC #>HL_MEM		;Hub memory is at $300
             STA (ADRPTR),Y
             RTS
 
 MIDNIB      LDA (ADRPTR),Y	;set MID nibble of read or write address
             AND #$0F
-            ASL DATA
-            ASL DATA
-            ASL DATA
-            ASL DATA
-            ORA DATA
+            ASL DATANB
+            ASL DATANB
+            ASL DATANB
+            ASL DATANB
+            ORA DATANB
             STA (ADRPTR),Y
             RTS
 
@@ -360,7 +359,7 @@ CMD_04      LDY #DAT_PT		;write hi nibble of byte to write address
 CMD_05      CLC				;add data value to the write address
             LDY #WRI_PT
             LDA (ADRPTR),Y
-            ADC DATA
+            ADC DATANB
             STA (ADRPTR),Y
             BCC BRC9F0
             CLC
@@ -411,7 +410,7 @@ CMD_0E      LDA HTIMER+1		;read Hub timer hi
             JSR BYTOUT
             JMP JUMP00
 
-CMD_0F      LDA DATA			;start Hub timer (and Hub-Hub copy process)
+CMD_0F      LDA DATANB		;start Hub timer (and Hub-Hub copy process)
             CMP #1
             BNE BRCA56
             JSR CLRDSP
@@ -594,7 +593,7 @@ STOREB      STA (IN_BUF),Y	;stash byte
             STA HUB_BS
             STA HUB_CS
             LDA #2			; keep 'em disabled for 2 main loops
-            STA IN_BLOC
+            STA INBLOC
             JSR BEEP			; make a beep to signal overrun
 BRCBA6      RTS
 
