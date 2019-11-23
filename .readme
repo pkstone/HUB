@@ -5,11 +5,11 @@ How this was done:
 
 1) HUB ROM Memory was dumped in SYM HS Cassette Format, and recorded into an Audacity file, then exported to a 16-bit WAV file.
 
-2) WAV file was scanned with 'DecodeWav.py', a Python program which counted the samples between zero crossings and converted
-    these timings into ones and zeros, then assembled these into bytes.
+2) WAV file was scanned with 'DecodeWav.py', a Python program included here which counts the samples between zero crossings
+    and converts these timings into ones and zeros, then assembles these into bytes of 6502 machine code.
 
 3) The resulting 6502 machine code was disassembled and then decorated with labels and comments to show the workings of
     the program.
 
-Also included: SYMCassetteSimulator.ino -- an Arduino program that uses the Arduino to simulate the output of a saved
-    SYM program, thus making it possible to read files into the SYM via its cassette input port.
+Also included: SYMCassetteSimulator.ino -- an Arduino program that uses the Arduino to simulate the output of a cassette
+    dump from a SYM, thus making it possible to read files into the SYM via its cassette input port.
