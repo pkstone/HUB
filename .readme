@@ -3,7 +3,7 @@ The original source was lost, so this is disassembled from onboard ROM.
 
 How this was done:
 
-1) HUB ROM Memory was dumped in SYM HS Cassette Format, and recorded into an Audacity file, then exported to a 16-bit WAV file.
+1) HUB ROM Memory was dumped in SYM HS Cassette Format, and recorded into Audacity, then exported to a 16-bit WAV file.
 
 2) WAV file was scanned with 'DecodeWav.py', a Python program included here which counts the samples between zero crossings
     and converts these timings into ones and zeros, then assembles these into bytes of 6502 machine code.
